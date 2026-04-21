@@ -55,6 +55,11 @@
     }
   });
 
+// Báo cho parent biết iframe đã sẵn sàng nhận INIT
+window.addEventListener('load', () => {
+    window.parent.postMessage({ type: 'IFRAME_READY' }, '*');
+});
+
   // Gửi kết quả về GAS parent
   function sendToParent(type, payload) {
     window.parent.postMessage({ type, ...payload }, '*');
