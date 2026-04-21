@@ -44,7 +44,7 @@
   const btnNormal = document.getElementById('btn-normal');
   const btnError = document.getElementById('btn-error');
 
-  // Nhận dữ liệu từ GAS parent qua postMessage
+// Nhận dữ liệu từ GAS parent qua postMessage
   let maNV = '';
   let faceData = null; // Float32Array descriptor đã lưu
 
@@ -52,6 +52,11 @@
     if (e.data && e.data.type === 'INIT') {
         maNV = e.data.maNV || '';
         faceData = e.data.faceData ? new Float32Array(JSON.parse(e.data.faceData)) : null;
+        
+        // ĐOẠN CODE MỚI: Ẩn nút "Đăng ký mặt" nếu không phải là ADMIN
+        if (e.data.role !== 'ADMIN') {
+            document.getElementById('btnEnroll').style.display = 'none';
+        }
     }
 
     // Thêm đoạn này
