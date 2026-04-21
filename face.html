@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Face Scanner</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Inter, sans-serif; background: #f8fafc; display: flex; flex-direction: column; align-items: center; padding: 16px; }
+    #status { color: #4338ca; font-weight: 500; text-align: center; margin-bottom: 12px; min-height: 48px; padding: 0 8px; font-size: 14px; }
+    #status.error { color: #ef4444; }
+    #video-wrapper { background: #1f2937; border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+    video { display: block; transform: scaleX(-1); }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    button { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 14px; }
+    #btnEnroll { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    #btnVerify { background: linear-gradient(135deg,#10b981,#059669); color: #fff; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #btnRetry { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+  </style>
+</head>
+<body>
+
+<div id="status">Đang khởi động AI và Camera...</div>
+
+<div id="video-wrapper">
+  <video id="video" width="320" height="240" autoplay muted playsinline></video>
+</div>
+
+<div class="btn-row" id="btn-normal">
+  <button id="btnEnroll" disabled>Đăng ký mặt</button>
+  <button id="btnVerify" disabled>Xác thực</button>
+</div>
+<div class="btn-row" id="btn-error" style="display:none">
+  <button id="btnRetry">🔄 Thử Lại Camera</button>
+</div>
+
+<script>
+  const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+  const video = document.getElementById('video');
+  const statusEl = document.getElementById('status');
+  const btnEnroll = document.getElementById('btnEnroll');
+  const btnVerify = document.getElementById('btnVerify');
+  const btnNormal = document.getElementById('btn-normal');
+  const btnError = document.getElementById('btn-error');
+
+  // Nhận dữ liệu từ GAS parent qua postMessage
+  let maNV = '';
+  let faceData = null; // Float32Array descriptor đã lưu
+
+  window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'INIT') {
+      maNV = e.data.maNV || '';
+      faceData = e.data.faceData ? new Float32Array(JSON.parse(e.data.faceData)) : null;
+    }
+  });
+
+  // Gửi kết quả về GAS parent
+  function sendToParent(type, payload) {
+    window.parent.postMessage({ type, ...payload }, '*');
+  }
+
+  function setStatus(msg, isError = false) {
+    statusEl.textContent = msg;
+    statusEl.className = isError ? 'error' : '';
+  }
+
+  let streamRef = null;
+  let modelsLoaded = false;
+
+  async function init() {
+    setStatus('Đang tải AI models...');
+    btnNormal.style.display = 'flex';
+    btnError.style.display = 'none';
+
+    try {
+      if (!modelsLoaded) {
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+        ]);
+        modelsLoaded = true;
+      }
+      setStatus('Đang yêu cầu quyền Camera...');
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
+        audio: false
+      });
+
+      streamRef = stream;
+      video.srcObject = stream;
+      await video.play();
+
+      setStatus('Vui lòng nhìn thẳng vào camera...');
+      btnEnroll.disabled = false;
+      btnVerify.disabled = false;
+
+    } catch (err) {
+      console.error(err);
+      btnNormal.style.display = 'none';
+      btnError.style.display = 'flex';
+
+      if (err.name === 'NotAllowedError') {
+        setStatus('Trình duyệt chặn Camera. Bấm vào 🔒 trên thanh địa chỉ → Cho phép Camera.', true);
+      } else if (err.name === 'NotFoundError') {
+        setStatus('Không tìm thấy Camera trên thiết bị này.', true);
+      } else if (err.name === 'NotReadableError') {
+        setStatus('Camera đang bị ứng dụng khác chiếm dụng (Zalo, Meet...). Hãy tắt chúng và thử lại.', true);
+      } else {
+        setStatus('Lỗi: ' + err.message, true);
+      }
+    }
+  }
+
+  document.getElementById('btnRetry').onclick = init;
+
+  // ĐĂNG KÝ KHUÔN MẶT
+  btnEnroll.onclick = async () => {
+    setStatus('Đang quét khuôn mặt để đăng ký...');
+    const det = await faceapi
+      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if (det) {
+      const descriptorStr = JSON.stringify(Array.from(det.descriptor));
+      // Gửi về GAS để lưu vào Sheets
+      sendToParent('ENROLL', { maNV, descriptor: descriptorStr });
+      setStatus('✅ Đã gửi dữ liệu khuôn mặt để lưu!');
+    } else {
+      setStatus('⚠️ Không tìm thấy khuôn mặt rõ nét, hãy thử lại.', true);
+    }
+  };
+
+  // XÁC THỰC KHUÔN MẶT
+  btnVerify.onclick = async () => {
+    if (!faceData) {
+      setStatus('❌ Nhân viên chưa đăng ký khuôn mặt!', true);
+      return;
+    }
+    setStatus('Đang xác thực...');
+    const det = await faceapi
+      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptor()
+      .withFaceExpressions();
+
+    if (det) {
+      const distance = faceapi.euclideanDistance(det.descriptor, faceData);
+      if (distance < 0.55) {
+        setStatus('✅ Nhận diện thành công!');
+        sendToParent('VERIFIED', { maNV, distance });
+      } else {
+        setStatus(`❌ Khuôn mặt không khớp! (Độ lệch: ${distance.toFixed(2)})`, true);
+        sendToParent('FAILED', { maNV, distance });
+      }
+    } else {
+      setStatus('⚠️ Không tìm thấy khuôn mặt.', true);
+    }
+  };
+
+  init();
+</script>
+</body>
+</html>
