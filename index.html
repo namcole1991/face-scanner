@@ -238,7 +238,7 @@ const firebaseConfig = {
             },
         });
 
-        // --- API SERVER CALL ---
+// --- API SERVER CALL ---
 // Trỏ về "Nhà kho" Google Apps Script
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxmfBEq7A4pVPTlgyXTXNlVel-OLpCF77WNzBLLdFdlIjQKCP3kWLXMGoNBEq35_61p/exec';
 
@@ -2939,6 +2939,87 @@ const GPSCheckIn = () => {
             <Snackbar open={toast.open} autoHideDuration={5000} onClose={() => setToast({ ...toast, open: false })}>
                 <Alert severity={toast.severity} variant="filled">{toast.msg}</Alert>
             </Snackbar>
+        </Box>
+    );
+};
+const FaceCheckIn = ({ user, onVerified }) => {
+    const iframeRef = useRef(null);
+    const [status, setStatus] = useState('Đang khởi tạo Camera...');
+    
+    // LẤY THÊM "user: loggedInUser" ĐỂ BIẾT AI ĐANG ĐĂNG NHẬP
+    const { employees, user: loggedInUser } = React.useContext(DataContext);
+
+    const FACE_URL = 'https://namcole1991-web.github.io/face-scanner/face.html';
+
+    const handleIframeLoad = () => {
+        const currentEmp = employees.find(e => e.maNV === user.maNV) || user;
+        
+        iframeRef.current?.contentWindow?.postMessage({
+            type: 'INIT',
+            maNV: currentEmp.maNV,
+            faceData: currentEmp.face_data || null,
+            role: loggedInUser?.role // TRUYỀN QUYỀN (ADMIN hoặc EMPLOYEE) SANG IFRAME
+        }, '*');
+        
+        setStatus(''); 
+    };
+
+    useEffect(() => {
+        const handleMessage = (e) => {
+            const data = e.data || {};
+
+            if (data.type === 'ENROLL' && data.descriptor) {
+                setStatus('Đang lưu dữ liệu lên hệ thống...');
+                callServer('saveFaceData', data.maNV, data.descriptor).then(res => {
+                    setStatus(res.success ? '✅ Đã lưu khuôn mặt thành công!' : '❌ Lỗi: ' + res.message);
+                    // Báo lại kết quả cho iframe để hiện thông báo xanh
+                    iframeRef.current?.contentWindow?.postMessage({
+                        type: 'ENROLL_RESULT',
+                        success: res.success,
+                        message: res.message
+                    }, '*');
+                });
+            }
+
+            if (data.type === 'VERIFIED') {
+                setStatus('✅ Xác thực khuôn mặt thành công!');
+                setTimeout(() => onVerified(), 1500); 
+            }
+
+            if (data.type === 'FAILED') {
+                setStatus('❌ Khuôn mặt không khớp! Vui lòng thử lại.');
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [user.maNV]);
+
+    return (
+        <Box sx={{ p: 2, textAlign: 'center' }}>
+            {status && (
+                <Typography
+                    variant="subtitle1"
+                    color={status.includes('❌') ? 'error' : 'primary'}
+                    gutterBottom
+                    sx={{ minHeight: 32, fontWeight: 500 }}
+                >
+                    {status}
+                </Typography>
+            )}
+            <Box sx={{ borderRadius: 2, overflow: 'hidden', display: 'inline-block', bgcolor: '#1f2937' }}>
+                <iframe
+                    ref={iframeRef}
+                    src={FACE_URL}
+                    onLoad={handleIframeLoad} 
+                    width="360"
+                    height="400"
+                    frameBorder="0"
+                    allow="camera; microphone"
+                    style={{ display: 'block', border: 'none' }}
+                    title="Face Scanner"
+                />
+            </Box>
         </Box>
     );
 };
