@@ -2613,7 +2613,8 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
 
 // --- GPS CHECK-IN COMPONENT (EMPLOYEE) ---
 const GPSCheckIn = () => {
-    const { user } = React.useContext(DataContext);
+    // Thêm 'employees' vào Context để kiểm tra xem nhân viên đã đăng ký mặt chưa
+    const { user, employees } = React.useContext(DataContext); 
     const [gpsStatus, setGpsStatus] = useState('idle'); // idle, loading, success, error
     const [userLocation, setUserLocation] = useState(null);
     const [officeLocation, setOfficeLocation] = useState(null);
@@ -2624,7 +2625,6 @@ const GPSCheckIn = () => {
     const [toast, setToast] = useState({ open: false, msg: '', severity: 'success' });
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Thêm State để quản lý việc ẩn/hiện popup quét khuôn mặt
     const [showFaceScanner, setShowFaceScanner] = useState(false);
 
     // Cập nhật đồng hồ mỗi giây
@@ -2655,11 +2655,10 @@ const GPSCheckIn = () => {
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
-    // Lấy vị trí GPS
+    // Lấy vị trí GPS ngầm
     const detectLocation = useCallback(() => {
         if (!navigator.geolocation) {
             setGpsStatus('error');
-            setToast({ open: true, msg: 'Trình duyệt không hỗ trợ GPS', severity: 'error' });
             return;
         }
         setGpsStatus('loading');
@@ -2675,7 +2674,6 @@ const GPSCheckIn = () => {
             },
             (err) => {
                 setGpsStatus('error');
-                setToast({ open: true, msg: 'Không lấy được vị trí: Vui lòng cấp quyền Vị trí cho trình duyệt', severity: 'error' });
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
@@ -2689,22 +2687,40 @@ const GPSCheckIn = () => {
     const isInRange = distance !== null && officeLocation && distance <= officeLocation.radius;
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-    // BƯỚC 1: Xử lý khi nhân viên bấm nút Chấm Công
+    // ==========================================
+    // LUỒNG XỬ LÝ MỚI: QUÉT MẶT TRƯỚC -> GPS SAU
+    // ==========================================
+
     const handleCheckInClick = () => {
-        if (!userLocation) {
-            setToast({ open: true, msg: 'Vui lòng đợi hệ thống xác định vị trí GPS', severity: 'warning' });
-            return;
-        }
-        if (!isInRange) {
-            setToast({ open: true, msg: `Bạn đang ở ngoài phạm vi cho phép (${officeLocation.radius}m). Hãy di chuyển lại gần văn phòng!`, severity: 'error' });
+        // Kiểm tra xem nhân viên đã được Admin đăng ký khuôn mặt chưa
+        const currentEmp = employees.find(e => e.maNV === user.maNV) || user;
+        if (!currentEmp.face_data) {
+            setToast({ open: true, msg: '❌ Bạn chưa được đăng ký khuôn mặt! Vui lòng liên hệ Admin.', severity: 'error' });
             return;
         }
         
-        // Đã đúng vị trí -> Mở Camera quét mặt
+        // Đã có dữ liệu mặt -> Luôn mở Camera đầu tiên
         setShowFaceScanner(true);
     };
 
-    // BƯỚC 2: Hàm thực sự ghi nhận lên server (Chỉ gọi khi mặt đã khớp)
+    const handleFaceVerified = () => {
+        setShowFaceScanner(false); // Tắt popup camera
+
+        // Sau khi mặt khớp, bắt đầu kiểm duyệt GPS
+        if (!userLocation || gpsStatus !== 'success') {
+            setToast({ open: true, msg: '❌ Chưa lấy được tọa độ GPS. Vui lòng bật định vị và thử lại.', severity: 'error' });
+            return;
+        }
+        
+        if (!isInRange) {
+            setToast({ open: true, msg: `❌ Bạn đang ở ngoài phạm vi (${Math.round(distance)}m > ${officeLocation.radius}m). Hãy di chuyển lại gần văn phòng!`, severity: 'error' });
+            return;
+        }
+
+        // GPS hợp lệ -> Ghi nhận lên máy chủ
+        executeCheckInOnServer();
+    };
+
     const executeCheckInOnServer = () => {
         setCheckingIn(true);
         callServer('gpsCheckIn', user.maNV, userLocation.latitude, userLocation.longitude)
@@ -2713,7 +2729,7 @@ const GPSCheckIn = () => {
                 setResult(res);
                 if (res.success) {
                     setToast({ open: true, msg: res.message, severity: 'success' });
-                    // Cập nhật lại lịch sử hôm nay để giao diện hiển thị giờ
+                    // Tải lại lịch sử để hiện giờ ra/vào mới
                     callServer('getMyAttendanceToday', user.maNV).then(r => {
                         if (r) setTodayRecord(r);
                     });
@@ -2727,12 +2743,6 @@ const GPSCheckIn = () => {
             });
     };
 
-    // BƯỚC 3: Callback nhận tín hiệu từ Iframe Camera
-    const handleFaceVerified = () => {
-        setShowFaceScanner(false); // Đóng Popup Camera
-        executeCheckInOnServer();  // Kích hoạt ghi giờ vào Google Sheets
-    };
-
     return (
         <Box>
             <Box sx={{ mb: { xs: 2, md: 4 }, display: { xs: 'none', md: 'block' } }}>
@@ -2741,7 +2751,6 @@ const GPSCheckIn = () => {
             </Box>
 
             <Grid container spacing={{ xs: 2, md: 3 }}>
-                {/* Giao diện Chấm công */}
                 <Grid item xs={12} md={7}>
                     <Paper sx={{
                         borderRadius: { xs: 3, md: 4 }, overflow: 'hidden', boxShadow: 3,
@@ -2787,7 +2796,7 @@ const GPSCheckIn = () => {
                                             {distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`}
                                         </Typography>
                                         <Typography variant="body2" sx={{ opacity: 0.7, mt: 0.5 }}>
-                                            {isInRange ? '✅ Trong phạm vi cho phép' : `❌ Ngoài phạm vi (cần ≤ ${officeLocation?.radius}m)`}
+                                            {isInRange ? '✅ Trong phạm vi' : `❌ Ngoài phạm vi (cần ≤ ${officeLocation?.radius}m)`}
                                         </Typography>
                                     </Box>
                                 )}
@@ -2798,19 +2807,19 @@ const GPSCheckIn = () => {
                                 <Button
                                     variant="contained"
                                     size="large"
-                                    disabled={checkingIn || gpsStatus !== 'success' || !isInRange}
-                                    onClick={handleCheckInClick} // Đổi sự kiện gọi hàm mới
+                                    disabled={checkingIn} // Bỏ giới hạn khóa nút do GPS
+                                    onClick={handleCheckInClick} // Bật Camera
                                     fullWidth={isMobile}
                                     sx={{
                                         px: { xs: 4, md: 6 }, py: { xs: 1.5, md: 2 }, borderRadius: { xs: 3, md: 4 },
                                         fontWeight: 800, fontSize: { xs: '1rem', md: '1.2rem' },
-                                        background: isInRange
+                                        background: gpsStatus === 'success' && isInRange
                                             ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                                             : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-                                        boxShadow: isInRange ? '0 10px 30px -5px rgba(16, 185, 129, 0.5)' : 'none',
+                                        boxShadow: gpsStatus === 'success' && isInRange ? '0 10px 30px -5px rgba(16, 185, 129, 0.5)' : 'none',
                                         '&:hover': {
-                                            background: isInRange ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' : undefined,
-                                            boxShadow: isInRange ? '0 15px 35px -5px rgba(16, 185, 129, 0.6)' : 'none'
+                                            background: gpsStatus === 'success' && isInRange ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' : undefined,
+                                            boxShadow: gpsStatus === 'success' && isInRange ? '0 15px 35px -5px rgba(16, 185, 129, 0.6)' : 'none'
                                         },
                                         transition: 'all 0.3s',
                                         minWidth: { xs: 'auto', md: 280 },
@@ -2834,7 +2843,7 @@ const GPSCheckIn = () => {
                     </Paper>
                 </Grid>
 
-                {/* Các thẻ thông tin bên phải (Hôm nay, Trạng thái...) giữ nguyên */}
+                {/* Các thẻ thông tin bên phải (Hôm nay, Trạng thái...) */}
                 <Grid item xs={12} md={5}>
                     <Stack spacing={3}>
                         {/* Lịch sử hôm nay */}
@@ -2930,84 +2939,6 @@ const GPSCheckIn = () => {
             <Snackbar open={toast.open} autoHideDuration={5000} onClose={() => setToast({ ...toast, open: false })}>
                 <Alert severity={toast.severity} variant="filled">{toast.msg}</Alert>
             </Snackbar>
-        </Box>
-    );
-};
-const FaceCheckIn = ({ user, onVerified }) => {
-    const iframeRef = useRef(null);
-    const [status, setStatus] = useState('Đang khởi tạo Camera...');
-    // Lấy danh sách nhân viên từ Context để trích xuất face_data chính xác
-    const { employees } = React.useContext(DataContext);
-
-    const FACE_URL = 'https://namcole1991-web.github.io/face-scanner/face.html';
-
-    // Hàm gửi dữ liệu khởi tạo sang iframe khi iframe đã load xong
-    const handleIframeLoad = () => {
-        // Tìm data của nhân viên hiện tại để lấy face_data mới nhất
-        const currentEmp = employees.find(e => e.maNV === user.maNV) || user;
-        
-        iframeRef.current?.contentWindow?.postMessage({
-            type: 'INIT',
-            maNV: currentEmp.maNV,
-            faceData: currentEmp.face_data || null
-        }, '*');
-        
-        setStatus(''); // Xóa chữ đang khởi tạo
-    };
-
-    useEffect(() => {
-        const handleMessage = (e) => {
-            const data = e.data || {};
-
-            // Xử lý khi Đăng ký (Enroll) thành công
-            if (data.type === 'ENROLL' && data.descriptor) {
-                setStatus('Đang lưu dữ liệu lên hệ thống...');
-                callServer('saveFaceData', data.maNV, data.descriptor).then(res => {
-                    setStatus(res.success ? '✅ Đã lưu khuôn mặt thành công!' : '❌ Lỗi: ' + res.message);
-                });
-            }
-
-            // Xử lý khi Xác thực (Verify) thành công
-            if (data.type === 'VERIFIED') {
-                setStatus('✅ Xác thực khuôn mặt thành công!');
-                setTimeout(() => onVerified(), 1500); // Đóng popup hoặc gọi hàm chấm công sau 1.5s
-            }
-
-            // Xử lý khi Xác thực thất bại
-            if (data.type === 'FAILED') {
-                setStatus('❌ Khuôn mặt không khớp! Vui lòng thử lại.');
-            }
-        };
-
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
-    }, [user.maNV]);
-
-    return (
-        <Box sx={{ p: 2, textAlign: 'center' }}>
-            {status && (
-                <Typography
-                    variant="subtitle1"
-                    color={status.includes('❌') ? 'error' : 'primary'}
-                    gutterBottom
-                    sx={{ minHeight: 32, fontWeight: 500 }}
-                >
-                    {status}
-                </Typography>
-            )}
-            <Box sx={{ borderRadius: 2, overflow: 'hidden', display: 'inline-block', bgcolor: '#1f2937' }}>
-                <iframe
-                    ref={iframeRef}
-                    src={FACE_URL}
-                    onLoad={handleIframeLoad} // Gửi dữ liệu ngay khi load xong
-                    width="360"
-                    height="400"
-                    frameBorder="0"
-                    allow="camera; microphone"
-                    style={{ display: 'block', border: 'none' }}
-                    title="Face Scanner"
-                />
-            </Box>
         </Box>
     );
 };
