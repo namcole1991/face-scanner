@@ -50,10 +50,19 @@
 
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'INIT') {
-      maNV = e.data.maNV || '';
-      faceData = e.data.faceData ? new Float32Array(JSON.parse(e.data.faceData)) : null;
+        maNV = e.data.maNV || '';
+        faceData = e.data.faceData ? new Float32Array(JSON.parse(e.data.faceData)) : null;
     }
-  });
+
+    // Thêm đoạn này
+    if (e.data && e.data.type === 'ENROLL_RESULT') {
+        if (e.data.success) {
+            setStatus('✅ Đã lưu khuôn mặt vào hệ thống!');
+        } else {
+            setStatus('❌ Lỗi lưu: ' + e.data.message, true);
+        }
+    }
+});
 
 // Báo cho parent biết iframe đã sẵn sàng nhận INIT
 window.addEventListener('load', () => {
