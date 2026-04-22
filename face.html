@@ -43,22 +43,11 @@
   const btnNormal = document.getElementById('btn-normal');
   const btnError = document.getElementById('btn-error');
 
-  // Hàm in lỗi ra màn hình (giúp chúng ta bắt lỗi dễ dàng nếu bị đen màn hình)
-  window.onerror = function(msg) {
-     setStatus("Lỗi JS: " + msg, true);
-  };
-
-  function setStatus(msg, isError = false) {
-    statusEl.textContent = msg;
-    statusEl.className = isError ? 'error' : '';
-  }
-
   let maNV = '';
   let faceData = null; 
 
-  // 1. Trỏ vào thư mục models bạn đã upload lên GitHub
   const humanConfig = {
-    modelBasePath: './models', 
+    modelBasePath: 'https://vladmandic.github.io/human/models/', 
     face: {
       enabled: true,
       detector: { return: true, rotation: true },
@@ -72,20 +61,15 @@
     gesture: { enabled: false }
   };
 
-  // 2. Sửa lại cú pháp khởi tạo Human chuẩn
-  let human;
-  try {
-     human = new Human(humanConfig);
-  } catch(e) {
-     setStatus("Lỗi AI: " + e.message, true);
-  }
+  // Đã sửa lại thành new Human chuẩn xác
+  const human = new Human(humanConfig);
 
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'INIT') {
         maNV = e.data.maNV || '';
         faceData = e.data.faceData ? Object.values(JSON.parse(e.data.faceData)) : null;
         
-        // Ẩn nút đăng ký nếu là Sinh viên/Nhân viên
+        // Ẩn nút Đăng Ký nếu không phải là ADMIN
         if (e.data.role !== 'ADMIN') {
             btnEnroll.style.display = 'none';
         }
@@ -108,6 +92,11 @@
     window.parent.postMessage({ type, ...payload }, '*');
   }
 
+  function setStatus(msg, isError = false) {
+    statusEl.textContent = msg;
+    statusEl.className = isError ? 'error' : '';
+  }
+
   async function init() {
     setStatus('Đang khởi tạo Camera và tải AI...');
     btnNormal.style.display = 'flex';
@@ -123,9 +112,9 @@
       video.srcObject = stream;
       await video.play();
 
-      // Đợi video load khung hình đầu tiên xong mới chạy AI để tránh lỗi 'inputs'
+      // Khắc phục triệt để lỗi "inputs": Đợi video có khung hình thực sự
       video.onloadeddata = async () => {
-         await human.detect(video); 
+         await human.detect(video); // Chạy mồi 1 khung hình
          setStatus('Vui lòng nhìn thẳng vào camera...');
          btnEnroll.disabled = false;
          btnVerify.disabled = false;
@@ -135,7 +124,7 @@
       console.error(err);
       btnNormal.style.display = 'none';
       btnError.style.display = 'flex';
-      setStatus('Trình duyệt chặn Camera: ' + err.message, true);
+      setStatus('Lỗi hoặc Trình duyệt bị chặn Camera.', true);
     }
   }
 
@@ -181,7 +170,7 @@
       // So sánh khuôn mặt 1:1
       const simScore = human.similarity(face.embedding, faceData);
       
-      if (simScore > 0.5) { 
+      if (simScore > 0.5) { // Threshold > 0.5 là khớp
         setStatus(`✅ Xác thực thành công! (${(simScore * 100).toFixed(0)}%)`);
         sendToParent('VERIFIED', { maNV, distance: simScore });
       } else {
