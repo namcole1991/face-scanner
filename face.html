@@ -2,8 +2,8 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Face Scanner</title>
-  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <title>Face Scanner (Human AI)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/human/dist/human.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: Inter, sans-serif; background: #f8fafc; display: flex; flex-direction: column; align-items: center; padding: 16px; }
@@ -36,7 +36,6 @@
 </div>
 
 <script>
-  const MODEL_URL = './weights';
   const video = document.getElementById('video');
   const statusEl = document.getElementById('status');
   const btnEnroll = document.getElementById('btnEnroll');
@@ -44,22 +43,41 @@
   const btnNormal = document.getElementById('btn-normal');
   const btnError = document.getElementById('btn-error');
 
-// Nhận dữ liệu từ GAS parent qua postMessage
   let maNV = '';
-  let faceData = null; // Float32Array descriptor đã lưu
+  let faceData = null; 
 
+  // Cấu hình cho thư viện Human
+  const humanConfig = {
+    modelBasePath: './models', // Gọi thẳng vào thư mục models bạn vừa upload
+    filter: { equalization: true }, // Tự cân bằng sáng nếu phòng hơi tối
+    face: {
+      enabled: true,
+      detector: { return: true, rotation: true },
+      mesh: { enabled: true },
+      description: { enabled: true }, // Sinh ra mã nhận diện khuôn mặt
+      antispoof: { enabled: true }, // BẬT TÍNH NĂNG CHỐNG DÙNG ẢNH GIẢ MẠO
+      liveness: { enabled: true }
+    },
+    body: { enabled: false }, // Tắt nhận diện cơ thể cho nhẹ
+    hand: { enabled: false }, // Tắt nhận diện tay
+    gesture: { enabled: false }
+  };
+
+  const human = new Human.Human(humanConfig);
+
+  // Lắng nghe dữ liệu từ phần mềm Ký Túc Xá (GAS)
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'INIT') {
         maNV = e.data.maNV || '';
-        faceData = e.data.faceData ? new Float32Array(JSON.parse(e.data.faceData)) : null;
+        // Khôi phục mảng dữ liệu khuôn mặt cũ
+        faceData = e.data.faceData ? Object.values(JSON.parse(e.data.faceData)) : null;
         
-        // ĐOẠN CODE MỚI: Ẩn nút "Đăng ký mặt" nếu không phải là ADMIN
+        // Ẩn nút Đăng Ký nếu là Nhân Viên
         if (e.data.role !== 'ADMIN') {
-            document.getElementById('btnEnroll').style.display = 'none';
+            btnEnroll.style.display = 'none';
         }
     }
 
-    // Thêm đoạn này
     if (e.data && e.data.type === 'ENROLL_RESULT') {
         if (e.data.success) {
             setStatus('✅ Đã lưu khuôn mặt vào hệ thống!');
@@ -67,14 +85,12 @@
             setStatus('❌ Lỗi lưu: ' + e.data.message, true);
         }
     }
-});
+  });
 
-// Báo cho parent biết iframe đã sẵn sàng nhận INIT
-window.addEventListener('load', () => {
+  window.addEventListener('load', () => {
     window.parent.postMessage({ type: 'IFRAME_READY' }, '*');
-});
+  });
 
-  // Gửi kết quả về GAS parent
   function sendToParent(type, payload) {
     window.parent.postMessage({ type, ...payload }, '*');
   }
@@ -84,24 +100,13 @@ window.addEventListener('load', () => {
     statusEl.className = isError ? 'error' : '';
   }
 
-  let streamRef = null;
-  let modelsLoaded = false;
-
   async function init() {
-    setStatus('Đang tải AI models...');
+    setStatus('Đang tải AI models siêu tốc...');
     btnNormal.style.display = 'flex';
     btnError.style.display = 'none';
 
     try {
-      if (!modelsLoaded) {
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
-        ]);
-        modelsLoaded = true;
-      }
+      await human.load(); // Tải model
       setStatus('Đang yêu cầu quyền Camera...');
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -109,9 +114,11 @@ window.addEventListener('load', () => {
         audio: false
       });
 
-      streamRef = stream;
       video.srcObject = stream;
       await video.play();
+
+      // Khởi động trước model bằng 1 khung hình ảo để lúc ấn nút sẽ mượt
+      await human.detect(video);
 
       setStatus('Vui lòng nhìn thẳng vào camera...');
       btnEnroll.disabled = false;
@@ -123,11 +130,7 @@ window.addEventListener('load', () => {
       btnError.style.display = 'flex';
 
       if (err.name === 'NotAllowedError') {
-        setStatus('Trình duyệt chặn Camera. Bấm vào 🔒 trên thanh địa chỉ → Cho phép Camera.', true);
-      } else if (err.name === 'NotFoundError') {
-        setStatus('Không tìm thấy Camera trên thiết bị này.', true);
-      } else if (err.name === 'NotReadableError') {
-        setStatus('Camera đang bị ứng dụng khác chiếm dụng (Zalo, Meet...). Hãy tắt chúng và thử lại.', true);
+        setStatus('Trình duyệt chặn Camera. Vui lòng ấn vào ổ khóa 🔒 cấp quyền.', true);
       } else {
         setStatus('Lỗi: ' + err.message, true);
       }
@@ -136,48 +139,59 @@ window.addEventListener('load', () => {
 
   document.getElementById('btnRetry').onclick = init;
 
-  // ĐĂNG KÝ KHUÔN MẶT
-  btnEnroll.onclick = async () => {
-    setStatus('Đang quét khuôn mặt để đăng ký...');
-    const det = await faceapi
-      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptor();
+  // Hàm quét gom gọn cho cả 2 nút
+  async function getFaceData() {
+     const result = await human.detect(video);
+     if (result.face && result.face.length > 0) {
+        return result.face[0];
+     }
+     return null;
+  }
 
-    if (det) {
-      const descriptorStr = JSON.stringify(Array.from(det.descriptor));
-      // Gửi về GAS để lưu vào Sheets
+  // NÚT ĐĂNG KÝ (Chỉ Admin thấy)
+  btnEnroll.onclick = async () => {
+    setStatus('Đang phân tích khuôn mặt để đăng ký...');
+    const face = await getFaceData();
+
+    if (face && face.embedding) {
+      const descriptorStr = JSON.stringify(Array.from(face.embedding));
       sendToParent('ENROLL', { maNV, descriptor: descriptorStr });
       setStatus('✅ Đã gửi dữ liệu khuôn mặt để lưu!');
     } else {
-      setStatus('⚠️ Không tìm thấy khuôn mặt rõ nét, hãy thử lại.', true);
+      setStatus('⚠️ Không tìm thấy khuôn mặt rõ nét. Hãy nhìn thẳng và thử lại.', true);
     }
   };
 
-  // XÁC THỰC KHUÔN MẶT
+  // NÚT XÁC THỰC
   btnVerify.onclick = async () => {
-    if (!faceData) {
-      setStatus('❌ Nhân viên chưa đăng ký khuôn mặt!', true);
+    if (!faceData || faceData.length === 0) {
+      setStatus('❌ Chưa có dữ liệu khuôn mặt trên máy chủ!', true);
       return;
     }
-    setStatus('Đang xác thực...');
-    const det = await faceapi
-      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptor()
-      .withFaceExpressions();
 
-    if (det) {
-      const distance = faceapi.euclideanDistance(det.descriptor, faceData);
-      if (distance < 0.55) {
-        setStatus('✅ Nhận diện thành công!');
-        sendToParent('VERIFIED', { maNV, distance });
+    setStatus('Đang xác thực...');
+    const face = await getFaceData();
+
+    if (face && face.embedding) {
+      // 1. Kiểm tra ảnh giả mạo (Anti-spoofing)
+      if (face.real < 0.5) {
+         setStatus('❌ Phát hiện ảnh giả mạo/chụp lại! Vui lòng dùng người thật.', true);
+         return;
+      }
+
+      // 2. Tính toán độ giống nhau
+      const match = human.match(face.embedding, faceData);
+      
+      // Độ giống nhau > 0.55 được coi là khớp
+      if (match.similarity > 0.55) {
+        setStatus(`✅ Nhận diện thành công! (Khớp ${(match.similarity * 100).toFixed(0)}%)`);
+        sendToParent('VERIFIED', { maNV, distance: match.distance });
       } else {
-        setStatus(`❌ Khuôn mặt không khớp! (Độ lệch: ${distance.toFixed(2)})`, true);
-        sendToParent('FAILED', { maNV, distance });
+        setStatus(`❌ Khuôn mặt không khớp! (Độ giống: ${(match.similarity * 100).toFixed(0)}%)`, true);
+        sendToParent('FAILED', { maNV, distance: match.distance });
       }
     } else {
-      setStatus('⚠️ Không tìm thấy khuôn mặt.', true);
+      setStatus('⚠️ Không tìm thấy khuôn mặt trong khung hình.', true);
     }
   };
 
