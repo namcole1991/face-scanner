@@ -2945,9 +2945,7 @@ const GPSCheckIn = () => {
 const FaceCheckIn = ({ user, onVerified }) => {
     const iframeRef = useRef(null);
     const [status, setStatus] = useState('Đang khởi tạo Camera...');
-    
-    // LẤY THÊM "user: loggedInUser" ĐỂ BIẾT AI ĐANG ĐĂNG NHẬP
-    const { employees, user: loggedInUser } = React.useContext(DataContext);
+    const { employees } = React.useContext(DataContext);
 
     const FACE_URL = 'https://namcole1991-web.github.io/face-scanner/face.html';
 
@@ -2958,10 +2956,10 @@ const FaceCheckIn = ({ user, onVerified }) => {
             type: 'INIT',
             maNV: currentEmp.maNV,
             faceData: currentEmp.face_data || null,
-            role: loggedInUser?.role // TRUYỀN QUYỀN (ADMIN hoặc EMPLOYEE) SANG IFRAME
+            role: user.role // THÊM DÒNG NÀY ĐỂ BÁO CHO IFRAME BIẾT LÀ AI ĐANG ĐĂNG NHẬP
         }, '*');
         
-        setStatus(''); 
+        setStatus('');
     };
 
     useEffect(() => {
@@ -2972,18 +2970,12 @@ const FaceCheckIn = ({ user, onVerified }) => {
                 setStatus('Đang lưu dữ liệu lên hệ thống...');
                 callServer('saveFaceData', data.maNV, data.descriptor).then(res => {
                     setStatus(res.success ? '✅ Đã lưu khuôn mặt thành công!' : '❌ Lỗi: ' + res.message);
-                    // Báo lại kết quả cho iframe để hiện thông báo xanh
-                    iframeRef.current?.contentWindow?.postMessage({
-                        type: 'ENROLL_RESULT',
-                        success: res.success,
-                        message: res.message
-                    }, '*');
                 });
             }
 
             if (data.type === 'VERIFIED') {
                 setStatus('✅ Xác thực khuôn mặt thành công!');
-                setTimeout(() => onVerified(), 1500); 
+                setTimeout(() => onVerified(), 1500);
             }
 
             if (data.type === 'FAILED') {
@@ -3011,7 +3003,7 @@ const FaceCheckIn = ({ user, onVerified }) => {
                 <iframe
                     ref={iframeRef}
                     src={FACE_URL}
-                    onLoad={handleIframeLoad} 
+                    onLoad={handleIframeLoad}
                     width="360"
                     height="400"
                     frameBorder="0"
