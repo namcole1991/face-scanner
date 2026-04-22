@@ -2925,19 +2925,29 @@ const GPSCheckIn = () => {
             </Grid>
 
             {/* Popup Camera hiển thị lên khi bấm Chấm Công */}
+            {/* Popup Camera hiển thị Full Màn Hình trên Mobile */}
             <Dialog 
                 open={showFaceScanner} 
-                onClose={() => setShowFaceScanner(false)} 
+                onClose={(event, reason) => {
+                    // Không cho phép đóng popup nếu bấm ra ngoài vùng xám (backdropClick)
+                    if (reason !== 'backdropClick') setShowFaceScanner(false);
+                }} 
+                fullScreen={isMobile} // Bật Fullscreen trên điện thoại
                 maxWidth="sm" 
                 fullWidth 
-                PaperProps={{ sx: { borderRadius: 3, bgcolor: '#f8fafc' } }}
+                PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: '#000', m: isMobile ? 0 : 2 } }}
             >
-                <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>Xác Thực Khuôn Mặt</DialogTitle>
-                <DialogContent>
+                {/* Ẩn DialogTitle trên mobile để tiết kiệm diện tích cho Camera */}
+                {!isMobile && <DialogTitle sx={{ textAlign: 'center', pb: 1, color: '#fff' }}>Xác Thực Khuôn Mặt</DialogTitle>}
+                
+                <DialogContent sx={{ p: 0, height: isMobile ? '100vh' : '500px' }}>
                     {showFaceScanner && <FaceCheckIn user={user} onVerified={handleFaceVerified} />}
                 </DialogContent>
-                <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
-                    <Button onClick={() => setShowFaceScanner(false)} color="inherit" variant="outlined" sx={{ borderRadius: 2 }}>Hủy Bỏ</Button>
+                
+                <DialogActions sx={{ justifyContent: 'center', p: 2, bgcolor: '#111827' }}>
+                    <Button onClick={() => setShowFaceScanner(false)} color="error" variant="contained" sx={{ borderRadius: 2, width: '100%', maxWidth: 300 }}>
+                        Đóng Camera
+                    </Button>
                 </DialogActions>
             </Dialog>
 
@@ -2950,71 +2960,65 @@ const GPSCheckIn = () => {
 const FaceCheckIn = ({ user, onVerified }) => {
     const iframeRef = useRef(null);
     const [status, setStatus] = useState('Đang khởi tạo Camera...');
-    const { employees } = React.useContext(DataContext);
+    // Lấy thông tin user đang đăng nhập (để biết là ADMIN hay EMPLOYEE)
+    const { employees, user: loggedInUser } = React.useContext(DataContext);
 
     const FACE_URL = 'https://namcole1991-web.github.io/face-scanner/face.html';
 
     const handleIframeLoad = () => {
         const currentEmp = employees.find(e => e.maNV === user.maNV) || user;
-        
         iframeRef.current?.contentWindow?.postMessage({
             type: 'INIT',
             maNV: currentEmp.maNV,
             faceData: currentEmp.face_data || null,
-            role: user.role // THÊM DÒNG NÀY ĐỂ BÁO CHO IFRAME BIẾT LÀ AI ĐANG ĐĂNG NHẬP
+            role: loggedInUser?.role || 'EMPLOYEE'
         }, '*');
-        
         setStatus('');
     };
 
     useEffect(() => {
         const handleMessage = (e) => {
             const data = e.data || {};
-
             if (data.type === 'ENROLL' && data.descriptor) {
                 setStatus('Đang lưu dữ liệu lên hệ thống...');
                 callServer('saveFaceData', data.maNV, data.descriptor).then(res => {
                     setStatus(res.success ? '✅ Đã lưu khuôn mặt thành công!' : '❌ Lỗi: ' + res.message);
+                    iframeRef.current?.contentWindow?.postMessage({
+                        type: 'ENROLL_RESULT',
+                        success: res.success,
+                        message: res.message
+                    }, '*');
                 });
             }
-
             if (data.type === 'VERIFIED') {
-                setStatus('✅ Xác thực khuôn mặt thành công!');
-                setTimeout(() => onVerified(), 1500);
+                setStatus('✅ Xác thực thành công! Đang ghi nhận...');
+                setTimeout(() => onVerified(), 1500); // 1.5s sau mới đóng popup để lưu GPS
             }
-
             if (data.type === 'FAILED') {
-                setStatus('❌ Khuôn mặt không khớp! Vui lòng thử lại.');
+                setStatus('❌ Xác thực khuôn mặt không thành công!');
+                // KHÔNG gọi hàm đóng popup ở đây, giữ nguyên iframe để người dùng ấn "Quét Lại"
             }
         };
-
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [user.maNV]);
+    }, [user.maNV, onVerified]);
 
     return (
-        <Box sx={{ p: 2, textAlign: 'center' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#000' }}>
             {status && (
-                <Typography
-                    variant="subtitle1"
-                    color={status.includes('❌') ? 'error' : 'primary'}
-                    gutterBottom
-                    sx={{ minHeight: 32, fontWeight: 500 }}
-                >
+                <Typography variant="subtitle2" sx={{ textAlign: 'center', p: 1, fontWeight: 600, color: status.includes('❌') ? '#fca5a5' : '#6ee7b7', bgcolor: '#111827' }}>
                     {status}
                 </Typography>
             )}
-            <Box sx={{ borderRadius: 2, overflow: 'hidden', display: 'inline-block', bgcolor: '#1f2937' }}>
+            <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
+                {/* Đã đổi width, height thành 100% để tự động vừa mọi màn hình */}
                 <iframe
                     ref={iframeRef}
                     src={FACE_URL}
                     onLoad={handleIframeLoad}
-                    width="360"
-                    height="400"
-                    frameBorder="0"
-                    allow="camera; microphone"
-                    style={{ display: 'block', border: 'none' }}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
                     title="Face Scanner"
+                    allow="camera; microphone"
                 />
             </Box>
         </Box>
