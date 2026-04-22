@@ -2456,7 +2456,7 @@ const GPSSettings = () => {
             setToast({ open: true, msg: 'Vui lòng nhập tọa độ', severity: 'error' });
             return;
         }
-        if (!form.time_start || !form.time_end || form.time_start >= form.time_end) {
+        if (!form.time_start || !form.time_end) {
             setToast({ open: true, msg: 'Thời gian cấu hình không hợp lệ', severity: 'error' });
             return;
         }
@@ -2708,11 +2708,19 @@ const GPSCheckIn = () => {
         if (officeLocation) detectLocation();
     }, [officeLocation, detectLocation]);
 
-    // KIỂM TRA ĐIỀU KIỆN THỜI GIAN
+// KIỂM TRA ĐIỀU KIỆN THỜI GIAN QUA ĐÊM
     const isTimeValid = useMemo(() => {
         if (!officeLocation || !officeLocation.time_start || !officeLocation.time_end) return false;
         const currentStr = currentTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
-        return currentStr >= officeLocation.time_start && currentStr <= officeLocation.time_end;
+        
+        const start = officeLocation.time_start;
+        const end = officeLocation.time_end;
+
+        if (start <= end) {
+            return currentStr >= start && currentStr <= end;
+        } else {
+            return currentStr >= start || currentStr <= end; // Xử lý qua đêm
+        }
     }, [currentTime, officeLocation]);
 
     const isInRange = distance !== null && officeLocation && distance <= officeLocation.radius;
@@ -2792,10 +2800,10 @@ const GPSCheckIn = () => {
                 </Alert>
             )}
 
-            {/* HIỂN THỊ CẢNH BÁO THỜI GIAN */}
+{/* HIỂN THỊ CẢNH BÁO THỜI GIAN */}
             {hasFaceData && officeLocation && !isTimeValid && (
                 <Alert severity="error" sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}>
-                    Hệ thống chỉ cho phép điểm danh từ {officeLocation.time_start} đến {officeLocation.time_end}. Vui lòng quay lại sau!
+                    Hệ thống chỉ cho phép điểm danh từ {officeLocation.time_start} hôm nay đến {officeLocation.time_end} hôm nay. Vui lòng quay lại sau!
                 </Alert>
             )}
 
