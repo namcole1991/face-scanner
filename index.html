@@ -18,14 +18,10 @@
     <script crossorigin src="https://unpkg.com/@mui/material@5.15.0/umd/material-ui.development.js"></script>
     <script crossorigin src="https://unpkg.com/@emotion/react@11.11.0/dist/emotion-react.umd.min.js"></script>
     <script crossorigin src="https://unpkg.com/@emotion/styled@11.11.0/dist/emotion-styled.umd.min.js"></script>
-
     <script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/locale/vi.min.js"></script>
-
     <script crossorigin src="https://unpkg.com/recharts@2.12.0/umd/Recharts.js"></script>
-
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     
@@ -35,7 +31,6 @@
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-        
         @keyframes pulse-ring { 0% { transform: scale(0.5); opacity: 1; } 80%, 100% { transform: scale(2.5); opacity: 0; } }
         @keyframes pulse-dot { 0% { transform: scale(0.8); } 50% { transform: scale(1); } 100% { transform: scale(0.8); } }
         .gps-pulse-wrapper { position: relative; display: flex; align-items: center; justify-content: center; }
@@ -54,6 +49,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useCallback, useRef, Fragment } = React;
         
+        // --- FIREBASE CONFIG ---
         const firebaseConfig = {
           apiKey: "AIzaSyCDNcizfDP75nS-x9f6lw6ww_KeVyJrASg",
           authDomain: "dangnhapdiemdanh.firebaseapp.com",
@@ -62,10 +58,7 @@
           messagingSenderId: "384744808587",
           appId: "1:384744808587:web:15ff256e9f654d9e2ab48e"
         };
-        
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
+        if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
         const auth = firebase.auth();
         const googleProvider = new firebase.auth.GoogleAuthProvider();
 
@@ -73,9 +66,10 @@
             createTheme, ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Button, Container, Box,
             Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Grid, Card, CardContent, Chip, IconButton,
             Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert, Snackbar,
-            Drawer, List, ListItem, ListItemIcon, ListItemText, ListItemButton, Divider, useMediaQuery, Avatar, Stack, Zoom, Collapse, Backdrop, Slider, LinearProgress
+            Drawer, List, ListItem, ListItemIcon, ListItemText, ListItemButton, Divider, useMediaQuery, Avatar, Stack, Zoom, Collapse, Backdrop, Slider
         } = MaterialUI;
 
+        // --- THEME ---
         const theme = createTheme({
             palette: {
                 primary: { main: '#4338ca', light: '#6366f1', dark: '#312e81', contrastText: '#fff' },
@@ -91,18 +85,16 @@
                 h4: { fontWeight: 700, letterSpacing: '-0.02em' },
                 h5: { fontWeight: 600, letterSpacing: '-0.01em' },
                 h6: { fontWeight: 600 },
-                subtitle1: { fontWeight: 500 },
                 button: { fontWeight: 600, textTransform: 'none' },
             },
             components: {
                 MuiPaper: { styleOverrides: { rounded: { borderRadius: 12 } } },
                 MuiButton: { styleOverrides: { root: { borderRadius: 8, padding: '8px 16px' } } },
                 MuiCard: { styleOverrides: { root: { borderRadius: 16 } } },
-                MuiTableCell: { styleOverrides: { head: { backgroundColor: '#f9fafb', color: '#374151', fontWeight: 600 } } },
             },
         });
 
-        // --- API SERVER CALL ---
+        // --- API CALLS ---
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbxmfBEq7A4pVPTlgyXTXNlVel-OLpCF77WNzBLLdFdlIjQKCP3kWLXMGoNBEq35_61p/exec';
 
         const callServer = async (func, ...args) => {
@@ -122,53 +114,42 @@
         };
 
         const fetchAllData = () => callServer('getAllData').then(raw => typeof raw === 'string' ? JSON.parse(raw) : raw);
+        const DataContext = React.createContext(null);
 
-        const Icons = { Dashboard: 'dashboard', Employees: 'people', Departments: 'business', Positions: 'badge', Leave: 'event_note', Menu: 'menu', Add: 'add', Delete: 'delete', Edit: 'edit', Check: 'check', Close: 'close', Logout: 'logout' };
-
+        // --- MAIN LAYOUT ---
         const drawerWidth = 260;
-
         const MainLayout = ({ children, setView, currentView, user, setUser, settings }) => {
             const [mobileOpen, setMobileOpen] = useState(false);
             const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-
             const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
             const allMenuItems = [
-                { id: 'dashboard', label: 'Tổng quan', icon: Icons.Dashboard, roles: ['ADMIN'] },
+                { id: 'dashboard', label: 'Tổng quan', icon: 'dashboard', roles: ['ADMIN'] },
                 { id: 'timekeeping', label: 'Chấm công', icon: 'fact_check', roles: ['ADMIN'] },
                 { id: 'gps_checkin', label: 'Chấm công GPS', icon: 'my_location', roles: ['EMPLOYEE'] },
                 { id: 'calendar', label: 'Lịch làm việc', icon: 'calendar_month', roles: ['ADMIN'] },
-                { id: 'employees', label: 'Nhân sự', icon: Icons.Employees, roles: ['ADMIN'] },
-                { id: 'departments', label: 'Phòng ban', icon: Icons.Departments, roles: ['ADMIN'] },
-                { id: 'positions', label: 'Chức vụ', icon: Icons.Positions, roles: ['ADMIN'] },
-                { id: 'leave', label: 'Nghỉ phép', icon: Icons.Leave, roles: ['ADMIN', 'EMPLOYEE'] },
+                { id: 'employees', label: 'Nhân sự', icon: 'people', roles: ['ADMIN'] },
+                { id: 'departments', label: 'Phòng ban', icon: 'business', roles: ['ADMIN'] },
+                { id: 'positions', label: 'Chức vụ', icon: 'badge', roles: ['ADMIN'] },
+                { id: 'leave', label: 'Nghỉ phép', icon: 'event_note', roles: ['ADMIN', 'EMPLOYEE'] },
                 { id: 'salary_settings', label: 'Cài đặt lương', icon: 'payments', roles: ['ADMIN'] },
                 { id: 'salary_calculation', label: 'Bảng lương', icon: 'account_balance_wallet', roles: ['ADMIN'] },
                 { id: 'gps_settings', label: 'Cài đặt GPS', icon: 'settings_suggest', roles: ['ADMIN'] },
             ];
-
             const menuItems = allMenuItems.filter(item => item.roles.includes(user?.role || 'ADMIN'));
-
-            const handleLogout = () => {
-                localStorage.removeItem('hrms_user');
-                setUser(null);
-                setView('dashboard');
-            };
 
             const drawerContent = (
                 <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box sx={{ p: 1, bgcolor: theme.palette.primary.main, color: '#fff', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span className="material-icons">business</span>
-                        </Box>
+                        <Box sx={{ p: 1, bgcolor: theme.palette.primary.main, color: '#fff', borderRadius: '12px' }}><span className="material-icons">business</span></Box>
                         <Typography variant="h6" color="textPrimary" sx={{ fontWeight: 700, lineHeight: 1.2 }}>{settings?.company_name || 'HRMS System'}</Typography>
                     </Box>
                     <Divider sx={{ mb: 2 }} />
                     <List sx={{ px: 2, flexGrow: 1 }}>
                         {menuItems.map((item) => (
                             <ListItem key={item.id} disablePadding sx={{ mb: 1 }}>
-                                <ListItemButton selected={currentView === item.id} onClick={() => { setView(item.id); if (isMobile) setMobileOpen(false); }} sx={{ borderRadius: 2, '&.Mui-selected': { bgcolor: theme.palette.primary.main, color: '#fff', '&:hover': { bgcolor: theme.palette.primary.dark }, '& .material-icons': { color: '#fff' } } }}>
-                                    <ListItemIcon sx={{ minWidth: 40, color: currentView === item.id ? 'inherit' : theme.palette.text.secondary }}><span className="material-icons" style={{ fontSize: 24 }}>{item.icon}</span></ListItemIcon>
+                                <ListItemButton selected={currentView === item.id} onClick={() => { setView(item.id); if (isMobile) setMobileOpen(false); }} sx={{ borderRadius: 2, '&.Mui-selected': { bgcolor: theme.palette.primary.main, color: '#fff', '&:hover': { bgcolor: theme.palette.primary.dark }, '& .material-icons': { color: '#fff' } }}}>
+                                    <ListItemIcon sx={{ minWidth: 40, color: currentView === item.id ? 'inherit' : theme.palette.text.secondary }}><span className="material-icons">{item.icon}</span></ListItemIcon>
                                     <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: currentView === item.id ? 600 : 500 }} />
                                 </ListItemButton>
                             </ListItem>
@@ -179,12 +160,9 @@
                             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                                     <Avatar sx={{ width: 32, height: 32, bgcolor: theme.palette.secondary.main, fontSize: 14 }}>{user?.name ? user.name.charAt(0) : 'U'}</Avatar>
-                                    <Box sx={{ overflow: 'hidden' }}>
-                                        <Typography variant="subtitle2" noWrap>{user?.name || 'User'}</Typography>
-                                        <Typography variant="caption" color="textSecondary" noWrap>{user?.username || ''}</Typography>
-                                    </Box>
+                                    <Box sx={{ overflow: 'hidden' }}><Typography variant="subtitle2" noWrap>{user?.name || 'User'}</Typography><Typography variant="caption" color="textSecondary" noWrap>{user?.username || ''}</Typography></Box>
                                 </Box>
-                                <Button size="small" color="error" fullWidth variant="outlined" startIcon={<span className="material-icons">logout</span>} onClick={handleLogout}>Đăng xuất</Button>
+                                <Button size="small" color="error" fullWidth variant="outlined" startIcon={<span className="material-icons">logout</span>} onClick={() => { localStorage.removeItem('hrms_user'); setUser(null); setView('dashboard'); }}>Đăng xuất</Button>
                             </CardContent>
                         </Card>
                     </Box>
@@ -195,14 +173,12 @@
                 <Box sx={{ display: 'flex' }}>
                     <AppBar position="fixed" sx={{ width: { md: `calc(100% - ${drawerWidth}px)` }, ml: { md: `${drawerWidth}px` }, boxShadow: 'none', bgcolor: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(8px)', borderBottom: '1px solid #e5e7eb', color: theme.palette.text.primary }}>
                         <Toolbar>
-                            <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2, display: { md: 'none' } }}><span className="material-icons">{Icons.Menu}</span></IconButton>
-                            <Box sx={{ flexGrow: 1 }} />
-                            <IconButton color="default"><span className="material-icons" style={{ color: '#6b7280' }}>notifications</span></IconButton>
+                            <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2, display: { md: 'none' } }}><span className="material-icons">menu</span></IconButton>
                         </Toolbar>
                     </AppBar>
                     <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
-                        <Drawer variant="temporary" open={mobileOpen} onClose={handleDrawerToggle} ModalProps={{ keepMounted: true }} sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth } }}>{drawerContent}</Drawer>
-                        <Drawer variant="permanent" sx={{ display: { xs: 'none', md: 'block' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, borderRight: '1px solid #e5e7eb' } }} open>{drawerContent}</Drawer>
+                        <Drawer variant="temporary" open={mobileOpen} onClose={handleDrawerToggle} ModalProps={{ keepMounted: true }} sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { width: drawerWidth } }}>{drawerContent}</Drawer>
+                        <Drawer variant="permanent" sx={{ display: { xs: 'none', md: 'block' }, '& .MuiDrawer-paper': { width: drawerWidth, borderRight: '1px solid #e5e7eb' } }} open>{drawerContent}</Drawer>
                     </Box>
                     <Box component="main" sx={{ flexGrow: 1, p: 3, width: { md: `calc(100% - ${drawerWidth}px)` }, mt: 8, minHeight: '100vh' }}>
                         <Container maxWidth="xl">{children}</Container>
@@ -211,72 +187,31 @@
             );
         };
 
-        const DataContext = React.createContext(null);
-
-        // --- DASHBOARD COMPONENT ---
+        // --- DASHBOARD ---
         const Dashboard = () => {
             const { stats, loading } = React.useContext(DataContext);
-            const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip: ReTooltip, Legend, PieChart, Pie, Cell, AreaChart, Area, ResponsiveContainer, ComposedChart } = Recharts;
+            const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip: ReTooltip, Legend, PieChart, Pie, Cell, AreaChart, Area, ResponsiveContainer } = Recharts;
             const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
             const StatCard = ({ title, value, sub, color, icon }) => (
                 <Card sx={{ height: '100%', position: 'relative', overflow: 'hidden', boxShadow: 3 }}>
                     <Box sx={{ position: 'absolute', top: 0, right: 0, width: 100, height: 100, background: `linear-gradient(135deg, transparent 40%, ${color}20 100%)`, borderRadius: '0 0 0 100%' }} />
                     <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: `${color}15`, color: color }}><span className="material-icons" style={{ fontSize: 28 }}>{icon}</span></Box>
-                        </Box>
+                        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: `${color}15`, color: color, width: 'fit-content', mb: 2 }}><span className="material-icons">{icon}</span></Box>
                         <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>{value}</Typography>
-                        <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>{title}</Typography>
-                        <Typography variant="caption" sx={{ color: color, fontWeight: 600 }}>{sub}</Typography>
+                        <Typography variant="body2" color="textSecondary">{title}</Typography>
                     </CardContent>
                 </Card>
             );
 
-            const ChartBox = ({ title, children }) => (
-                <Paper sx={{ p: 3, height: 320, display: 'flex', flexDirection: 'column', borderRadius: 3, boxShadow: 2 }}>
-                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, fontSize: '1rem', color: '#374151' }}>{title}</Typography>
-                    <Box sx={{ flexGrow: 1, minHeight: 0 }}><ResponsiveContainer width="100%" height="100%">{children}</ResponsiveContainer></Box>
-                </Paper>
-            );
-
+            if (loading) return <CircularProgress />;
             return (
-                <Box>
-                    <Box sx={{ mb: 4 }}>
-                        <Typography variant="h4" sx={{ color: '#111827', fontWeight: 700 }}>Tổng Quan Nhân Sự</Typography>
-                    </Box>
-                    {loading ? <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}><CircularProgress /></Box> : (
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} sm={6} md={3}><StatCard title="Tổng Nhân Viên" value={stats.totalEmployees} sub="Chính thức" color="#4338ca" icon="groups" /></Grid>
-                            <Grid item xs={12} sm={6} md={3}><StatCard title="Có Mặt Hôm Nay" value={stats.presentToday} sub="Đang làm việc" color="#10b981" icon="check_circle" /></Grid>
-                            <Grid item xs={12} sm={6} md={3}><StatCard title="Nghỉ Phép" value={stats.onLeaveToday} sub="Đã được duyệt" color="#f59e0b" icon="beach_access" /></Grid>
-                            <Grid item xs={12} sm={6} md={3}><StatCard title="Chờ Duyệt" value={stats.pendingLeaves} sub="Cần xử lý ngay" color="#ef4444" icon="pending_actions" /></Grid>
-
-                            <Grid item xs={12} md={8}>
-                                <ChartBox title="Biến Động Nhân Sự (12 tháng qua)">
-                                    <AreaChart data={stats.charts.growth}>
-                                        <defs><linearGradient id="colorGrowth" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} /><stop offset="95%" stopColor="#8884d8" stopOpacity={0} /></linearGradient></defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
-                                        <YAxis axisLine={false} tickLine={false} />
-                                        <ReTooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                                        <Area type="monotone" dataKey="value" stroke="#8884d8" fillOpacity={1} fill="url(#colorGrowth)" />
-                                    </AreaChart>
-                                </ChartBox>
-                            </Grid>
-                            <Grid item xs={12} md={4}>
-                                <ChartBox title="Trạng Thái Đơn Từ">
-                                    <PieChart>
-                                        <Pie data={stats.charts.leaveStatus} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                                            {stats.charts.leaveStatus.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />)}
-                                        </Pie>
-                                        <ReTooltip /><Legend verticalAlign="bottom" height={36} />
-                                    </PieChart>
-                                </ChartBox>
-                            </Grid>
-                        </Grid>
-                    )}
-                </Box>
+                <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6} md={3}><StatCard title="Tổng Nhân Viên" value={stats.totalEmployees} color="#4338ca" icon="groups" /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><StatCard title="Có Mặt Hôm Nay" value={stats.presentToday} color="#10b981" icon="check_circle" /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><StatCard title="Nghỉ Phép" value={stats.onLeaveToday} color="#f59e0b" icon="beach_access" /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><StatCard title="Chờ Duyệt" value={stats.pendingLeaves} color="#ef4444" icon="pending_actions" /></Grid>
+                </Grid>
             );
         };
 
@@ -285,98 +220,20 @@
             const { departments, setDepartments, employees, confirmAction } = React.useContext(DataContext);
             const [open, setOpen] = useState(false);
             const [form, setForm] = useState({ maPB: '', tenPB: '', moTa: '' });
-            const [toast, setToast] = useState({ open: false, msg: '' });
-            const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-            const [expanded, setExpanded] = useState(null);
-
-            const deptStats = useMemo(() => {
-                const stats = {};
-                employees.forEach(e => {
-                    if (!stats[e.phongBan]) stats[e.phongBan] = [];
-                    stats[e.phongBan].push(e);
-                });
-                return stats;
-            }, [employees]);
 
             const handleSubmit = () => {
-                const newItem = { ...form };
-                setDepartments(prev => [...prev, newItem]);
-                setOpen(false); setForm({ maPB: '', tenPB: '', moTa: '' });
-                setToast({ open: true, msg: 'Đang thêm...' });
-
-                callServer('addDepartment', newItem).then(() => {
-                    setToast({ open: true, msg: 'Thêm thành công!' });
-                    fetchAllData().then(data => setDepartments(data.departments));
-                }).catch(() => {
-                    setToast({ open: true, msg: 'Lỗi khi thêm!' });
-                    setDepartments(prev => prev.filter(d => d.maPB !== newItem.maPB));
-                });
+                callServer('addDepartment', form).then(() => { fetchAllData().then(data => setDepartments(data.departments)); setOpen(false); });
             };
 
             const handleDelete = (id) => {
-                const performDelete = () => {
-                    const prev = [...departments];
-                    setDepartments(prev => prev.filter(d => d.maPB !== id));
-                    setToast({ open: true, msg: 'Đang xóa...' });
-                    callServer('deleteDepartment', id).then(() => setToast({ open: true, msg: 'Đã xóa!' })).catch(() => { setDepartments(prev); setToast({ open: true, msg: 'Lỗi khi xóa!' }); });
-                };
-                confirmAction('Xác nhận xóa', 'Bạn có chắc chắn muốn xóa phòng ban này?', performDelete);
-            };
-
-            const toggleExpand = (maPB) => {
-                setExpanded(expanded === maPB ? null : maPB);
-            };
-
-            const getGroupedEmployees = (maPB, deptName) => {
-                const emps = deptStats[deptName] || [];
-                if (emps.length === 0) return null;
-                const groups = {};
-                emps.forEach(e => {
-                    const pos = e.chucVu || 'Khác';
-                    if (!groups[pos]) groups[pos] = [];
-                    groups[pos].push(e);
-                });
-                return groups;
+                confirmAction('Xác nhận xóa', 'Xóa phòng ban này?', () => callServer('deleteDepartment', id).then(() => fetchAllData().then(data => setDepartments(data.departments))));
             };
 
             return (
                 <Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                        <Typography variant="h5" color="textPrimary">Quản Lý Phòng Ban</Typography>
-                        <Button variant="contained" startIcon={<span className="material-icons">add</span>} onClick={() => setOpen(true)}>Thêm mới</Button>
-                    </Box>
-                    <Paper sx={{ overflow: 'hidden' }}>
-                        <TableContainer>
-                            <Table>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Mã PB</TableCell><TableCell>Tên Phòng</TableCell><TableCell>Mô Tả</TableCell><TableCell align="right">Thao Tác</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {departments.map((row) => (
-                                        <TableRow key={row.maPB} hover>
-                                            <TableCell>{row.maPB}</TableCell>
-                                            <TableCell sx={{ fontWeight: 600 }}>{row.tenPB}</TableCell>
-                                            <TableCell>{row.moTa}</TableCell>
-                                            <TableCell align="right"><IconButton color="error" onClick={() => handleDelete(row.maPB)}><span className="material-icons">delete</span></IconButton></TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </Paper>
-                    <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
-                        <DialogTitle>Thêm Phòng Ban</DialogTitle>
-                        <DialogContent>
-                            <Stack spacing={2} sx={{ mt: 1 }}>
-                                <TextField label="Mã PB" fullWidth size="small" value={form.maPB} onChange={(e) => setForm({ ...form, maPB: e.target.value })} />
-                                <TextField label="Tên Phòng" fullWidth size="small" value={form.tenPB} onChange={(e) => setForm({ ...form, tenPB: e.target.value })} />
-                            </Stack>
-                        </DialogContent>
-                        <DialogActions><Button onClick={() => setOpen(false)}>Hủy</Button><Button onClick={handleSubmit}>Lưu</Button></DialogActions>
-                    </Dialog>
-                    <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast({ ...toast, open: false })}><Alert severity="success">{toast.msg}</Alert></Snackbar>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}><Typography variant="h5">Phòng Ban</Typography><Button variant="contained" onClick={() => setOpen(true)}>Thêm</Button></Box>
+                    <Paper><TableContainer><Table><TableHead><TableRow><TableCell>Mã</TableCell><TableCell>Tên</TableCell><TableCell>Xóa</TableCell></TableRow></TableHead><TableBody>{departments.map(d => <TableRow key={d.maPB}><TableCell>{d.maPB}</TableCell><TableCell>{d.tenPB}</TableCell><TableCell><IconButton color="error" onClick={() => handleDelete(d.maPB)}><span className="material-icons">delete</span></IconButton></TableCell></TableRow>)}</TableBody></Table></TableContainer></Paper>
+                    <Dialog open={open} onClose={() => setOpen(false)}><DialogTitle>Thêm</DialogTitle><DialogContent><TextField label="Mã" fullWidth margin="normal" value={form.maPB} onChange={e=>setForm({...form, maPB: e.target.value})} /><TextField label="Tên" fullWidth margin="normal" value={form.tenPB} onChange={e=>setForm({...form, tenPB: e.target.value})} /></DialogContent><DialogActions><Button onClick={handleSubmit}>Lưu</Button></DialogActions></Dialog>
                 </Box>
             );
         };
@@ -388,35 +245,23 @@
             const [form, setForm] = useState({ maCV: '', tenCV: '', moTa: '' });
 
             const handleSubmit = () => {
-                const newItem = { ...form };
-                setPositions(prev => [...prev, newItem]);
-                setOpen(false); setForm({ maCV: '', tenCV: '', moTa: '' });
-                callServer('addPosition', newItem).then(() => fetchAllData().then(data => setPositions(data.positions)));
-            };
-
-            const handleDelete = (id) => {
-                confirmAction('Xóa', 'Xóa chức vụ?', () => {
-                    const prev = [...positions];
-                    setPositions(prev => prev.filter(p => p.maCV !== id));
-                    callServer('deletePosition', id).catch(() => setPositions(prev));
-                });
+                callServer('addPosition', form).then(() => { fetchAllData().then(data => setPositions(data.positions)); setOpen(false); });
             };
 
             return (
                 <Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}><Typography variant="h5">Chức Vụ</Typography><Button variant="contained" onClick={() => setOpen(true)}>Thêm</Button></Box>
-                    <Paper><TableContainer><Table><TableHead><TableRow><TableCell>Mã</TableCell><TableCell>Tên</TableCell><TableCell>Xóa</TableCell></TableRow></TableHead><TableBody>{positions.map(p => <TableRow key={p.maCV}><TableCell>{p.maCV}</TableCell><TableCell>{p.tenCV}</TableCell><TableCell><IconButton color="error" onClick={() => handleDelete(p.maCV)}><span className="material-icons">delete</span></IconButton></TableCell></TableRow>)}</TableBody></Table></TableContainer></Paper>
-                    <Dialog open={open} onClose={() => setOpen(false)}><DialogTitle>Thêm</DialogTitle><DialogContent><TextField label="Mã" value={form.maCV} onChange={e=>setForm({...form, maCV: e.target.value})} /><TextField label="Tên" value={form.tenCV} onChange={e=>setForm({...form, tenCV: e.target.value})} /></DialogContent><DialogActions><Button onClick={handleSubmit}>Lưu</Button></DialogActions></Dialog>
+                    <Paper><TableContainer><Table><TableHead><TableRow><TableCell>Mã</TableCell><TableCell>Tên</TableCell></TableRow></TableHead><TableBody>{positions.map(p => <TableRow key={p.maCV}><TableCell>{p.maCV}</TableCell><TableCell>{p.tenCV}</TableCell></TableRow>)}</TableBody></Table></TableContainer></Paper>
+                    <Dialog open={open} onClose={() => setOpen(false)}><DialogTitle>Thêm</DialogTitle><DialogContent><TextField label="Mã" fullWidth margin="normal" value={form.maCV} onChange={e=>setForm({...form, maCV: e.target.value})} /><TextField label="Tên" fullWidth margin="normal" value={form.tenCV} onChange={e=>setForm({...form, tenCV: e.target.value})} /></DialogContent><DialogActions><Button onClick={handleSubmit}>Lưu</Button></DialogActions></Dialog>
                 </Box>
             );
         };
 
-        // --- BỘ NÕA AI: FACE CHECK IN ---
+        // --- FACE CHECK IN (TRÁI TIM CỦA AI) ---
         const FaceCheckIn = ({ user, mode = 'VERIFY', onSuccess }) => {
             const iframeRef = useRef(null);
             const [status, setStatus] = useState('Đang khởi tạo Camera...');
             const { employees, user: loggedInUser } = React.useContext(DataContext);
-
             const FACE_URL = 'https://namcole1991-web.github.io/face-scanner/face.html';
 
             const handleIframeLoad = () => {
@@ -426,7 +271,7 @@
                     maNV: currentEmp.maNV,
                     faceData: currentEmp.face_data || null,
                     role: loggedInUser?.role || 'EMPLOYEE',
-                    mode: mode // Truyền mode sang iframe (ENROLL hoặc VERIFY)
+                    mode: mode
                 }, '*');
                 setStatus('');
             };
@@ -434,23 +279,18 @@
             useEffect(() => {
                 const handleMessage = (e) => {
                     const data = e.data || {};
-                    
                     if (data.type === 'ENROLL' && data.descriptor) {
                         setStatus('Đang lưu dữ liệu...');
                         callServer('saveFaceData', data.maNV, data.descriptor).then(res => {
                             setStatus(res.success ? '✅ Đã lưu khuôn mặt thành công!' : '❌ Lỗi: ' + res.message);
                             iframeRef.current?.contentWindow?.postMessage({ type: 'ENROLL_RESULT', success: res.success, message: res.message }, '*');
-                            if (res.success) {
-                                setTimeout(() => { if(onSuccess) onSuccess(); }, 1500); 
-                            }
+                            if (res.success && onSuccess) setTimeout(onSuccess, 1500);
                         });
                     }
-                    
                     if (data.type === 'VERIFIED') {
                         setStatus('✅ Xác thực thành công! Đang ghi nhận...');
-                        setTimeout(() => { if(onSuccess) onSuccess(); }, 1500);
+                        if (onSuccess) setTimeout(onSuccess, 1500); 
                     }
-                    
                     if (data.type === 'FAILED') {
                         setStatus('❌ Khuôn mặt không khớp! Vui lòng ấn Xác Thực Lại.');
                     }
@@ -467,20 +307,13 @@
                         </Typography>
                     )}
                     <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
-                        <iframe
-                            ref={iframeRef}
-                            src={FACE_URL}
-                            onLoad={handleIframeLoad}
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-                            title="Face Scanner"
-                            allow="camera; microphone"
-                        />
+                        <iframe ref={iframeRef} src={FACE_URL} onLoad={handleIframeLoad} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allow="camera; microphone" />
                     </Box>
                 </Box>
             );
         };
 
-        // --- TRẠM KIỂM SOÁT TÂN BINH (BẮT BUỘC ĐĂNG KÝ MẶT LẦN ĐẦU) ---
+        // --- TRẠM KIỂM SOÁT TÂN BINH ---
         const ForceEnrollmentScreen = ({ user, onEnrolled }) => {
             return (
                 <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#111827', p: {xs: 0, sm: 2} }}>
@@ -500,11 +333,10 @@
 
         // --- EMPLOYEE LIST (ADMIN) ---
         const EmployeeList = () => {
-            const { employees, setEmployees, departments, positions } = React.useContext(DataContext);
+            const { employees } = React.useContext(DataContext);
             const [searchTerm, setSearchTerm] = useState('');
             const [scanUser, setScanUser] = useState(null); 
             const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-
             const filteredEmployees = employees.filter(emp => (emp.hoTen || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
             return (
@@ -533,35 +365,22 @@
                         </TableContainer>
                     </Paper>
 
-                    <Dialog 
-                        open={!!scanUser} 
-                        disableEscapeKeyDown={true}
-                        onClose={(event, reason) => { if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') setScanUser(null); }} 
-                        fullScreen={isMobile}
-                        maxWidth="sm" 
-                        fullWidth 
-                        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: '#000', m: isMobile ? 0 : 2 } }}
-                    >
+                    <Dialog open={!!scanUser} disableEscapeKeyDown={true} onClose={(event, reason) => { if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') setScanUser(null); }} fullScreen={isMobile} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: '#000', m: isMobile ? 0 : 2 } }}>
                         {!isMobile && <DialogTitle sx={{ textAlign: 'center', pb: 1, color: '#fff' }}>Đăng Ký Mặt - {scanUser?.hoTen}</DialogTitle>}
                         <DialogContent sx={{ p: 0, height: isMobile ? '100vh' : '550px', overflow: 'hidden' }}>
                             {scanUser && <FaceCheckIn user={scanUser} mode="ENROLL" onSuccess={() => setScanUser(null)} />}
                         </DialogContent>
-                        <DialogActions sx={{ justifyContent: 'center', p: 2, bgcolor: '#111827' }}>
-                            <Button onClick={() => setScanUser(null)} color="error" variant="contained" sx={{ width: '100%', maxWidth: 300 }}>Đóng Camera</Button>
-                        </DialogActions>
+                        <DialogActions sx={{ justifyContent: 'center', p: 2, bgcolor: '#111827' }}><Button onClick={() => setScanUser(null)} color="error" variant="contained" sx={{ width: '100%', maxWidth: 300 }}>Đóng Camera</Button></DialogActions>
                     </Dialog>
                 </Box>
             );
         };
 
         // --- LEAVE REQUESTS ---
-        const LeaveRequests = () => {
-            const { leaves } = React.useContext(DataContext);
-            return <Box><Typography variant="h5">Nghỉ Phép</Typography><Paper sx={{p:3, mt:2}}>{leaves.length} đơn</Paper></Box>;
-        };
+        const LeaveRequests = () => <Box><Typography variant="h5">Nghỉ Phép</Typography></Box>;
 
         // --- TIMEKEEPING ---
-        const Timekeeping = () => <Box><Typography variant="h5">Chấm Công Admin</Typography></Box>;
+        const Timekeeping = () => <Box><Typography variant="h5">Chấm Công (Lịch Sử)</Typography></Box>;
 
         // --- CALENDAR VIEW ---
         const CalendarView = () => <Box><Typography variant="h5">Lịch Làm Việc</Typography></Box>;
@@ -625,14 +444,12 @@
             const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
             const [toast, setToast] = useState({ open: false, msg: '' });
 
-            const handleCheckInClick = () => {
-                setShowFaceScanner(true);
-            };
+            const handleCheckInClick = () => setShowFaceScanner(true);
 
             const handleFaceVerified = () => {
                 setShowFaceScanner(false);
-                setToast({ open: true, msg: '✅ Xác thực thành công! Đang lưu GPS...' });
-                callServer('gpsCheckIn', user.maNV, 0, 0); // Đây là hàm mock GPS, gọi thật thì thêm navigator.geolocation
+                setToast({ open: true, msg: '✅ Xác thực thành công! Đang lưu điểm danh...' });
+                callServer('gpsCheckIn', user.maNV, 0, 0); // Fake coords for demo
             };
 
             return (
@@ -642,22 +459,12 @@
                         <Button variant="contained" size="large" onClick={handleCheckInClick}>BẤM VÀO ĐÂY ĐỂ ĐIỂM DANH</Button>
                     </Paper>
 
-                    <Dialog 
-                        open={showFaceScanner} 
-                        disableEscapeKeyDown={true} 
-                        onClose={(event, reason) => { if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') setShowFaceScanner(false); }}
-                        fullScreen={isMobile} 
-                        maxWidth="sm" 
-                        fullWidth 
-                        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: '#000', m: isMobile ? 0 : 2 } }}
-                    >
+                    <Dialog open={showFaceScanner} disableEscapeKeyDown={true} onClose={(event, reason) => { if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') setShowFaceScanner(false); }} fullScreen={isMobile} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: '#000', m: isMobile ? 0 : 2 } }}>
                         {!isMobile && <DialogTitle sx={{ textAlign: 'center', pb: 1, color: '#fff' }}>Xác Thực Khuôn Mặt</DialogTitle>}
                         <DialogContent sx={{ p: 0, height: isMobile ? '100vh' : '550px', overflow: 'hidden' }}>
                             {showFaceScanner && <FaceCheckIn user={user} mode="VERIFY" onSuccess={handleFaceVerified} />}
                         </DialogContent>
-                        <DialogActions sx={{ justifyContent: 'center', p: 2, bgcolor: '#111827' }}>
-                            <Button onClick={() => setShowFaceScanner(false)} color="error" variant="contained" sx={{ borderRadius: 2, width: '100%', maxWidth: 300 }}>Hủy / Đóng</Button>
-                        </DialogActions>
+                        <DialogActions sx={{ justifyContent: 'center', p: 2, bgcolor: '#111827' }}><Button onClick={() => setShowFaceScanner(false)} color="error" variant="contained" sx={{ borderRadius: 2, width: '100%', maxWidth: 300 }}>Hủy / Đóng</Button></DialogActions>
                     </Dialog>
 
                     <Snackbar open={toast.open} autoHideDuration={3000} onClose={()=>setToast({open:false, msg:''})}><Alert severity={toast.msg.includes('❌')?'error':'success'}>{toast.msg}</Alert></Snackbar>
@@ -665,7 +472,7 @@
             );
         };
 
-        // --- LOGIN COMPONENT ---
+        // --- LOGIN ---
         const Login = ({ onSuccess }) => {
             const [username, setUsername] = useState('');
             const [password, setPassword] = useState('');
@@ -722,7 +529,7 @@
 
             if (!user) return <ThemeProvider theme={theme}><CssBaseline /><Login onSuccess={(res) => { const userData = { ...res.user, role: res.role }; localStorage.setItem('hrms_user', JSON.stringify(userData)); setUser(userData); }} /></ThemeProvider>;
 
-            const ctxValue = { ...data, loading, setLoading, setEmployees: (d) => setData(p => ({...p, employees: d})), setLeaves: (d) => setData(p => ({...p, leaves: d})), setDepartments: (d) => setData(p => ({...p, departments: d})), setPositions: (d) => setData(p => ({...p, positions: d})), confirmAction: (t,c,act)=> {if(window.confirm(c)) act();}, user };
+            const ctxValue = { ...data, loading, setLoading, setEmployees: (d) => setData(p => ({...p, employees: d})), setDepartments: (d) => setData(p => ({...p, departments: d})), setPositions: (d) => setData(p => ({...p, positions: d})), user };
 
             // CHẶN NHÂN VIÊN CHƯA CÓ KHUÔN MẶT BẮT BUỘC ĐĂNG KÝ
             const isDataLoaded = data.employees && data.employees.length > 0;
