@@ -46,7 +46,6 @@
   let maNV = '';
   let faceData = null; 
 
-  // Cấu hình AI: Trỏ trực tiếp tới CDN của tác giả để tránh lỗi file
   const humanConfig = {
     modelBasePath: 'https://vladmandic.github.io/human/models/', 
     face: {
@@ -62,15 +61,14 @@
     gesture: { enabled: false }
   };
 
-  const human = new Human(humanConfig);
+  // SỬA LẠI DÒNG NÀY (Thêm .Human)
+  const human = new Human.Human(humanConfig);
 
-  // Nhận tín hiệu từ React
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'INIT') {
         maNV = e.data.maNV || '';
         faceData = e.data.faceData ? Object.values(JSON.parse(e.data.faceData)) : null;
         
-        // Ẩn nút đăng ký nếu không phải ADMIN
         if (e.data.role !== 'ADMIN') {
             btnEnroll.style.display = 'none';
         }
@@ -115,7 +113,6 @@
       video.srcObject = stream;
       await video.play();
 
-      // Phải đợi video có dữ liệu mới cho AI đọc để tránh lỗi 'inputs'
       video.onloadeddata = async () => {
          await human.detect(video);
          setStatus('Vui lòng nhìn thẳng vào camera...');
