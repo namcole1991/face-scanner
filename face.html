@@ -21,7 +21,7 @@
 </head>
 <body>
 
-<div id="status">Đang khởi tạo AI...</div>
+<div id="status">Đang tải cấu hình AI...</div>
 
 <div id="video-wrapper">
   <video id="video" width="320" height="240" autoplay muted playsinline></video>
@@ -43,11 +43,22 @@
   const btnNormal = document.getElementById('btn-normal');
   const btnError = document.getElementById('btn-error');
 
+  // Hàm in lỗi ra màn hình (giúp chúng ta bắt lỗi dễ dàng nếu bị đen màn hình)
+  window.onerror = function(msg) {
+     setStatus("Lỗi JS: " + msg, true);
+  };
+
+  function setStatus(msg, isError = false) {
+    statusEl.textContent = msg;
+    statusEl.className = isError ? 'error' : '';
+  }
+
   let maNV = '';
   let faceData = null; 
 
+  // 1. Trỏ vào thư mục models bạn đã upload lên GitHub
   const humanConfig = {
-    modelBasePath: 'https://vladmandic.github.io/human/models/', 
+    modelBasePath: './models', 
     face: {
       enabled: true,
       detector: { return: true, rotation: true },
@@ -61,14 +72,20 @@
     gesture: { enabled: false }
   };
 
-  // SỬA LẠI DÒNG NÀY (Thêm .Human)
-  const human = new Human.Human(humanConfig);
+  // 2. Sửa lại cú pháp khởi tạo Human chuẩn
+  let human;
+  try {
+     human = new Human(humanConfig);
+  } catch(e) {
+     setStatus("Lỗi AI: " + e.message, true);
+  }
 
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'INIT') {
         maNV = e.data.maNV || '';
         faceData = e.data.faceData ? Object.values(JSON.parse(e.data.faceData)) : null;
         
+        // Ẩn nút đăng ký nếu là Sinh viên/Nhân viên
         if (e.data.role !== 'ADMIN') {
             btnEnroll.style.display = 'none';
         }
@@ -91,20 +108,13 @@
     window.parent.postMessage({ type, ...payload }, '*');
   }
 
-  function setStatus(msg, isError = false) {
-    statusEl.textContent = msg;
-    statusEl.className = isError ? 'error' : '';
-  }
-
   async function init() {
-    setStatus('Đang tải AI models siêu tốc...');
+    setStatus('Đang khởi tạo Camera và tải AI...');
     btnNormal.style.display = 'flex';
     btnError.style.display = 'none';
 
     try {
       await human.load(); 
-      setStatus('Đang yêu cầu quyền Camera...');
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
         audio: false
@@ -113,8 +123,9 @@
       video.srcObject = stream;
       await video.play();
 
+      // Đợi video load khung hình đầu tiên xong mới chạy AI để tránh lỗi 'inputs'
       video.onloadeddata = async () => {
-         await human.detect(video);
+         await human.detect(video); 
          setStatus('Vui lòng nhìn thẳng vào camera...');
          btnEnroll.disabled = false;
          btnVerify.disabled = false;
@@ -124,7 +135,7 @@
       console.error(err);
       btnNormal.style.display = 'none';
       btnError.style.display = 'flex';
-      setStatus('Lỗi hoặc Trình duyệt chặn Camera.', true);
+      setStatus('Trình duyệt chặn Camera: ' + err.message, true);
     }
   }
 
@@ -153,7 +164,7 @@
 
   btnVerify.onclick = async () => {
     if (!faceData || faceData.length === 0) {
-      setStatus('❌ Sinh viên chưa đăng ký khuôn mặt!', true);
+      setStatus('❌ Chưa có dữ liệu khuôn mặt trên máy chủ!', true);
       return;
     }
 
@@ -161,19 +172,21 @@
     const face = await getFaceData();
 
     if (face && face.embedding) {
+      // Chống giả mạo ảnh (Anti-spoofing)
       if (face.real < 0.5) {
          setStatus('❌ Phát hiện ảnh giả mạo! Vui lòng dùng người thật.', true);
          return;
       }
 
-      const match = human.match(face.embedding, faceData);
+      // So sánh khuôn mặt 1:1
+      const simScore = human.similarity(face.embedding, faceData);
       
-      if (match.similarity > 0.55) {
-        setStatus(`✅ Xác thực thành công! (${(match.similarity * 100).toFixed(0)}%)`);
-        sendToParent('VERIFIED', { maNV, distance: match.distance });
+      if (simScore > 0.5) { 
+        setStatus(`✅ Xác thực thành công! (${(simScore * 100).toFixed(0)}%)`);
+        sendToParent('VERIFIED', { maNV, distance: simScore });
       } else {
-        setStatus(`❌ Khuôn mặt không khớp! (${(match.similarity * 100).toFixed(0)}%)`, true);
-        sendToParent('FAILED', { maNV, distance: match.distance });
+        setStatus(`❌ Khuôn mặt không khớp! (${(simScore * 100).toFixed(0)}%)`, true);
+        sendToParent('FAILED', { maNV, distance: simScore });
       }
     } else {
       setStatus('⚠️ Không tìm thấy khuôn mặt.', true);
