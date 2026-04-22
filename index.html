@@ -2634,11 +2634,9 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
             );
         };
 
-// --- GPS CHECK-IN COMPONENT (EMPLOYEE) ---
 const GPSCheckIn = () => {
-    // Thêm 'employees' vào Context để kiểm tra xem nhân viên đã đăng ký mặt chưa
     const { user, employees } = React.useContext(DataContext); 
-    const [gpsStatus, setGpsStatus] = useState('idle'); // idle, loading, success, error
+    const [gpsStatus, setGpsStatus] = useState('idle');
     const [userLocation, setUserLocation] = useState(null);
     const [officeLocation, setOfficeLocation] = useState(null);
     const [distance, setDistance] = useState(null);
@@ -2649,14 +2647,17 @@ const GPSCheckIn = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
 
     const [showFaceScanner, setShowFaceScanner] = useState(false);
+    const [scannerMode, setScannerMode] = useState('VERIFY'); // Quản lý chế độ camera
 
-    // Cập nhật đồng hồ mỗi giây
+    // Lấy thông tin nhân viên hiện tại để kiểm tra dữ liệu khuôn mặt
+    const currentEmp = employees.find(e => e.maNV === user.maNV) || user;
+    const hasFaceData = !!currentEmp.face_data;
+
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
 
-    // Tải vị trí văn phòng & lịch sử điểm danh hôm nay
     useEffect(() => {
         callServer('getOfficeLocation').then(res => {
             if (res) setOfficeLocation(res);
@@ -2668,7 +2669,6 @@ const GPSCheckIn = () => {
         }
     }, [user]);
 
-    // Tính toán khoảng cách (Haversine)
     const calcDistance = (lat1, lng1, lat2, lng2) => {
         const toRad = (deg) => deg * Math.PI / 180;
         const R = 6371000;
@@ -2678,7 +2678,6 @@ const GPSCheckIn = () => {
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
-    // Lấy vị trí GPS ngầm
     const detectLocation = useCallback(() => {
         if (!navigator.geolocation) {
             setGpsStatus('error');
@@ -2695,41 +2694,40 @@ const GPSCheckIn = () => {
                     setDistance(Math.round(dist));
                 }
             },
-            (err) => {
-                setGpsStatus('error');
-            },
+            (err) => setGpsStatus('error'),
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     }, [officeLocation]);
 
-    // Tự động tìm GPS khi mở màn hình
     useEffect(() => {
         if (officeLocation) detectLocation();
-    }, [officeLocation]);
+    }, [officeLocation, detectLocation]);
 
     const isInRange = distance !== null && officeLocation && distance <= officeLocation.radius;
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-    // ==========================================
-    // LUỒNG XỬ LÝ MỚI: QUÉT MẶT TRƯỚC -> GPS SAU
-    // ==========================================
-
-    const handleCheckInClick = () => {
-        // Kiểm tra xem nhân viên đã được Admin đăng ký khuôn mặt chưa
-        const currentEmp = employees.find(e => e.maNV === user.maNV) || user;
-        if (!currentEmp.face_data) {
-            setToast({ open: true, msg: '❌ Bạn chưa được đăng ký khuôn mặt! Vui lòng liên hệ Admin.', severity: 'error' });
-            return;
-        }
-        
-        // Đã có dữ liệu mặt -> Luôn mở Camera đầu tiên
+    // Bấm nút Đăng ký khuôn mặt
+    const handleEnrollClick = () => {
+        setScannerMode('ENROLL');
         setShowFaceScanner(true);
     };
 
-    const handleFaceVerified = () => {
-        setShowFaceScanner(false); // Tắt popup camera
+    // Bấm nút Chấm công
+    const handleCheckInClick = () => {
+        setScannerMode('VERIFY');
+        setShowFaceScanner(true);
+    };
 
-        // Sau khi mặt khớp, bắt đầu kiểm duyệt GPS
+    // Xử lý sau khi Camera báo thành công (Dùng chung cho cả Enroll và Verify)
+    const handleFaceSuccess = () => {
+        setShowFaceScanner(false); 
+
+        if (scannerMode === 'ENROLL') {
+            setToast({ open: true, msg: 'Tuyệt vời! Bạn đã đăng ký khuôn mặt thành công. Bây giờ có thể chấm công.', severity: 'success' });
+            return; // Đăng ký xong thì dừng lại, không chạy logic GPS
+        }
+
+        // Nếu là VERIFY (Chấm công) -> Chạy logic GPS
         if (!userLocation || gpsStatus !== 'success') {
             setToast({ open: true, msg: '❌ Chưa lấy được tọa độ GPS. Vui lòng bật định vị và thử lại.', severity: 'error' });
             return;
@@ -2740,7 +2738,6 @@ const GPSCheckIn = () => {
             return;
         }
 
-        // GPS hợp lệ -> Ghi nhận lên máy chủ
         executeCheckInOnServer();
     };
 
@@ -2752,7 +2749,6 @@ const GPSCheckIn = () => {
                 setResult(res);
                 if (res.success) {
                     setToast({ open: true, msg: res.message, severity: 'success' });
-                    // Tải lại lịch sử để hiện giờ ra/vào mới
                     callServer('getMyAttendanceToday', user.maNV).then(r => {
                         if (r) setTodayRecord(r);
                     });
@@ -2773,6 +2769,13 @@ const GPSCheckIn = () => {
                 <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>Hệ thống yêu cầu xác thực kép để đảm bảo tính chính xác</Typography>
             </Box>
 
+            {/* Cảnh báo nếu chưa có khuôn mặt */}
+            {!hasFaceData && (
+                <Alert severity="warning" sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}>
+                    Tài khoản của bạn chưa có dữ liệu sinh trắc học. Bắt buộc phải đăng ký khuôn mặt trước khi sử dụng chức năng chấm công!
+                </Alert>
+            )}
+
             <Grid container spacing={{ xs: 2, md: 3 }}>
                 <Grid item xs={12} md={7}>
                     <Paper sx={{
@@ -2780,9 +2783,6 @@ const GPSCheckIn = () => {
                         background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
                         color: 'white', position: 'relative'
                     }}>
-                        <Box sx={{ position: 'absolute', top: -30, right: -30, width: 200, height: 200, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)', display: { xs: 'none', sm: 'block' } }} />
-                        <Box sx={{ position: 'absolute', bottom: -50, left: -50, width: 250, height: 250, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.03)', display: { xs: 'none', sm: 'block' } }} />
-
                         <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 }, position: 'relative', zIndex: 1 }}>
                             {/* Đồng hồ */}
                             <Box sx={{ textAlign: 'center', mb: { xs: 2.5, md: 4 } }}>
@@ -2794,71 +2794,76 @@ const GPSCheckIn = () => {
                                 </Typography>
                             </Box>
 
-                            {/* Trạng thái GPS */}
-                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: { xs: 2.5, md: 4 } }}>
-                                <div className="gps-pulse-wrapper" style={{ marginBottom: 16 }}>
-                                    {gpsStatus === 'success' && <div className={`gps-pulse-ring ${isInRange ? '' : 'error'}`} />}
-                                    {gpsStatus === 'loading' ? (
-                                        <CircularProgress size={40} sx={{ color: 'white' }} />
-                                    ) : (
-                                        <div className={`gps-pulse-dot ${gpsStatus === 'success' && isInRange ? '' : 'error'}`} style={{ width: 40, height: 40 }} />
+                            {/* Trạng thái GPS (Chỉ hiện nếu ĐÃ có dữ liệu khuôn mặt) */}
+                            {hasFaceData && (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: { xs: 2.5, md: 4 } }}>
+                                    <div className="gps-pulse-wrapper" style={{ marginBottom: 16 }}>
+                                        {gpsStatus === 'success' && <div className={`gps-pulse-ring ${isInRange ? '' : 'error'}`} />}
+                                        {gpsStatus === 'loading' ? (
+                                            <CircularProgress size={40} sx={{ color: 'white' }} />
+                                        ) : (
+                                            <div className={`gps-pulse-dot ${gpsStatus === 'success' && isInRange ? '' : 'error'}`} style={{ width: 40, height: 40 }} />
+                                        )}
+                                    </div>
+
+                                    {gpsStatus === 'idle' && <Typography variant="body2" sx={{ opacity: 0.7 }}>Đang khởi tạo GPS...</Typography>}
+                                    {gpsStatus === 'loading' && <Typography variant="body2" sx={{ opacity: 0.7 }}>Đang xác định vị trí...</Typography>}
+                                    {gpsStatus === 'error' && (
+                                        <Box sx={{ textAlign: 'center' }}>
+                                            <Typography variant="body2" color="error.light">Không thể xác định vị trí</Typography>
+                                            <Button size="small" onClick={detectLocation} sx={{ color: 'white', mt: 1 }} startIcon={<span className="material-icons">refresh</span>}>Thử lại</Button>
+                                        </Box>
                                     )}
-                                </div>
+                                    {gpsStatus === 'success' && distance !== null && (
+                                        <Box sx={{ textAlign: 'center' }} className="fade-in-up">
+                                            <Typography variant="h5" sx={{ fontWeight: 700, color: isInRange ? '#34d399' : '#fca5a5' }}>
+                                                {distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ opacity: 0.7, mt: 0.5 }}>
+                                                {isInRange ? '✅ Trong phạm vi' : `❌ Ngoài phạm vi (cần ≤ ${officeLocation?.radius}m)`}
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </Box>
+                            )}
 
-                                {gpsStatus === 'idle' && <Typography variant="body2" sx={{ opacity: 0.7 }}>Đang khởi tạo GPS...</Typography>}
-                                {gpsStatus === 'loading' && <Typography variant="body2" sx={{ opacity: 0.7 }}>Đang xác định vị trí...</Typography>}
-                                {gpsStatus === 'error' && (
-                                    <Box sx={{ textAlign: 'center' }}>
-                                        <Typography variant="body2" color="error.light">Không thể xác định vị trí</Typography>
-                                        <Button size="small" onClick={detectLocation} sx={{ color: 'white', mt: 1 }} startIcon={<span className="material-icons">refresh</span>}>Thử lại</Button>
-                                    </Box>
-                                )}
-                                {gpsStatus === 'success' && distance !== null && (
-                                    <Box sx={{ textAlign: 'center' }} className="fade-in-up">
-                                        <Typography variant="h5" sx={{ fontWeight: 700, color: isInRange ? '#34d399' : '#fca5a5' }}>
-                                            {distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`}
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ opacity: 0.7, mt: 0.5 }}>
-                                            {isInRange ? '✅ Trong phạm vi' : `❌ Ngoài phạm vi (cần ≤ ${officeLocation?.radius}m)`}
-                                        </Typography>
-                                    </Box>
-                                )}
-                            </Box>
-
-                            {/* Nút bấm điểm danh */}
-                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                                <Button
-                                    variant="contained"
-                                    size="large"
-                                    disabled={checkingIn} // Bỏ giới hạn khóa nút do GPS
-                                    onClick={handleCheckInClick} // Bật Camera
-                                    fullWidth={isMobile}
-                                    sx={{
-                                        px: { xs: 4, md: 6 }, py: { xs: 1.5, md: 2 }, borderRadius: { xs: 3, md: 4 },
-                                        fontWeight: 800, fontSize: { xs: '1rem', md: '1.2rem' },
-                                        background: gpsStatus === 'success' && isInRange
-                                            ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                                            : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-                                        boxShadow: gpsStatus === 'success' && isInRange ? '0 10px 30px -5px rgba(16, 185, 129, 0.5)' : 'none',
-                                        '&:hover': {
-                                            background: gpsStatus === 'success' && isInRange ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' : undefined,
-                                            boxShadow: gpsStatus === 'success' && isInRange ? '0 15px 35px -5px rgba(16, 185, 129, 0.6)' : 'none'
-                                        },
-                                        transition: 'all 0.3s',
-                                        minWidth: { xs: 'auto', md: 280 },
-                                        maxWidth: { xs: '100%', md: 'none' }
-                                    }}
-                                    startIcon={checkingIn
-                                        ? <CircularProgress size={22} color="inherit" />
-                                        : <span className="material-icons" style={{ fontSize: isMobile ? 22 : 28 }}>{todayRecord && !todayRecord.gioRa ? 'logout' : 'face_retouching_natural'}</span>
-                                    }
-                                >
-                                    {checkingIn ? 'Đang xử lý...' : (todayRecord && !todayRecord.gioRa ? 'CHẤM CÔNG RA' : 'CHẤM CÔNG VÀO')}
-                                </Button>
-
-                                {gpsStatus === 'success' && (
-                                    <Button size="small" onClick={detectLocation} sx={{ color: 'rgba(255,255,255,0.6)' }} startIcon={<span className="material-icons" style={{ fontSize: 16 }}>refresh</span>}>
-                                        Cập nhật vị trí
+                            {/* Khu vực nút bấm */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, mt: hasFaceData ? 0 : 4 }}>
+                                {!hasFaceData ? (
+                                    <Button
+                                        variant="contained"
+                                        size="large"
+                                        onClick={handleEnrollClick}
+                                        fullWidth={isMobile}
+                                        sx={{
+                                            px: { xs: 4, md: 6 }, py: { xs: 1.5, md: 2 }, borderRadius: { xs: 3, md: 4 },
+                                            fontWeight: 800, fontSize: { xs: '1rem', md: '1.2rem' },
+                                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                            boxShadow: '0 10px 30px -5px rgba(245, 158, 11, 0.5)',
+                                            '&:hover': { background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' }
+                                        }}
+                                        startIcon={<span className="material-icons">face_retouching_natural</span>}
+                                    >
+                                        ĐĂNG KÝ KHUÔN MẶT
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="contained"
+                                        size="large"
+                                        disabled={checkingIn}
+                                        onClick={handleCheckInClick}
+                                        fullWidth={isMobile}
+                                        sx={{
+                                            px: { xs: 4, md: 6 }, py: { xs: 1.5, md: 2 }, borderRadius: { xs: 3, md: 4 },
+                                            fontWeight: 800, fontSize: { xs: '1rem', md: '1.2rem' },
+                                            background: gpsStatus === 'success' && isInRange
+                                                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                                : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+                                            boxShadow: gpsStatus === 'success' && isInRange ? '0 10px 30px -5px rgba(16, 185, 129, 0.5)' : 'none',
+                                        }}
+                                        startIcon={checkingIn ? <CircularProgress size={22} color="inherit" /> : <span className="material-icons">{todayRecord && !todayRecord.gioRa ? 'logout' : 'fingerprint'}</span>}
+                                    >
+                                        {checkingIn ? 'Đang xử lý...' : (todayRecord && !todayRecord.gioRa ? 'CHẤM CÔNG RA' : 'CHẤM CÔNG VÀO')}
                                     </Button>
                                 )}
                             </Box>
@@ -2866,10 +2871,8 @@ const GPSCheckIn = () => {
                     </Paper>
                 </Grid>
 
-                {/* Các thẻ thông tin bên phải (Hôm nay, Trạng thái...) */}
                 <Grid item xs={12} md={5}>
                     <Stack spacing={3}>
-                        {/* Lịch sử hôm nay */}
                         <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: 2 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: '#f0fdf4', color: '#16a34a' }}>
@@ -2910,60 +2913,28 @@ const GPSCheckIn = () => {
                                 </Box>
                             )}
                         </Paper>
-
-                        {/* Thông tin văn phòng */}
-                        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: 2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                                <Box sx={{ p: 1, borderRadius: 2, bgcolor: '#eff6ff', color: '#3b82f6' }}>
-                                    <span className="material-icons">business</span>
-                                </Box>
-                                <Typography variant="h6" sx={{ fontWeight: 600 }}>Văn Phòng</Typography>
-                            </Box>
-                            {officeLocation && officeLocation.latitude ? (
-                                <Stack spacing={1.5}>
-                                    {officeLocation.address && (
-                                        <Box sx={{ display: 'flex', alignItems: 'start', gap: 1 }}>
-                                            <span className="material-icons" style={{ fontSize: 18, color: '#9ca3af', marginTop: 2 }}>location_on</span>
-                                            <Typography variant="body2">{officeLocation.address}</Typography>
-                                        </Box>
-                                    )}
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <span className="material-icons" style={{ fontSize: 18, color: '#9ca3af' }}>radar</span>
-                                        <Typography variant="body2" color="textSecondary">
-                                            Bán kính cho phép: <b>{officeLocation.radius}m</b>
-                                        </Typography>
-                                    </Box>
-                                </Stack>
-                            ) : (
-                                <Alert severity="warning" variant="outlined" sx={{ borderRadius: 2 }}>Admin chưa cài đặt tọa độ văn phòng</Alert>
-                            )}
-                        </Paper>
                     </Stack>
                 </Grid>
             </Grid>
 
-            {/* Popup Camera hiển thị lên khi bấm Chấm Công */}
-            {/* Popup Camera hiển thị Full Màn Hình trên Mobile */}
-           {/* Popup Camera hiển thị Full Màn Hình trên Mobile và Cấm Tự Đóng */}
+            {/* Popup Camera dùng chung cho ENROLL và VERIFY */}
             <Dialog 
                 open={showFaceScanner} 
-                disableEscapeKeyDown={true} // Cấm đóng bằng phím Back trên Android
+                disableEscapeKeyDown={true}
                 onClose={(event, reason) => {
-                    // Cấm đóng khi chạm ra ngoài viền đen
                     if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') {
                         setShowFaceScanner(false);
                     }
                 }}
-                fullScreen={isMobile} // Tự động tràn màn hình khi dùng điện thoại
+                fullScreen={isMobile}
                 maxWidth="sm" 
                 fullWidth 
                 PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: '#000', m: isMobile ? 0 : 2 } }}
             >
-                {!isMobile && <DialogTitle sx={{ textAlign: 'center', pb: 1, color: '#fff' }}>Xác Thực Khuôn Mặt</DialogTitle>}
+                {!isMobile && <DialogTitle sx={{ textAlign: 'center', pb: 1, color: '#fff' }}>{scannerMode === 'ENROLL' ? 'Đăng Ký Khuôn Mặt' : 'Xác Thực Khuôn Mặt'}</DialogTitle>}
                 
-                {/* Đặt chiều cao tĩnh cho web, và chiều cao 100vh cho mobile */}
                 <DialogContent sx={{ p: 0, height: isMobile ? '100vh' : '550px', overflow: 'hidden' }}>
-                    {showFaceScanner && <FaceCheckIn user={user} onVerified={handleFaceVerified} />}
+                    {showFaceScanner && <FaceCheckIn user={user} mode={scannerMode} onVerified={handleFaceSuccess} />}
                 </DialogContent>
                 
                 <DialogActions sx={{ justifyContent: 'center', p: 2, bgcolor: '#111827' }}>
@@ -2979,10 +2950,11 @@ const GPSCheckIn = () => {
         </Box>
     );
 };
-const FaceCheckIn = ({ user, onVerified }) => {
+const FaceCheckIn = ({ user, onVerified, mode = 'VERIFY' }) => {
     const iframeRef = useRef(null);
     const [status, setStatus] = useState('Đang khởi tạo Camera...');
-    const { employees, user: loggedInUser } = React.useContext(DataContext);
+    // Thêm setEmployees để cập nhật state ngay sau khi đăng ký thành công
+    const { employees, setEmployees, user: loggedInUser } = React.useContext(DataContext);
 
     const FACE_URL = 'https://namcole1991-web.github.io/face-scanner/face.html';
 
@@ -2992,7 +2964,8 @@ const FaceCheckIn = ({ user, onVerified }) => {
             type: 'INIT',
             maNV: currentEmp.maNV,
             faceData: currentEmp.face_data || null,
-            role: loggedInUser?.role || 'EMPLOYEE'
+            role: loggedInUser?.role || 'EMPLOYEE',
+            mode: mode // Truyền mode (ENROLL hoặc VERIFY) xuống iframe
         }, '*');
         setStatus('');
     };
@@ -3001,35 +2974,39 @@ const FaceCheckIn = ({ user, onVerified }) => {
         const handleMessage = (e) => {
             const data = e.data || {};
             
-            // XỬ LÝ LƯU KHUÔN MẶT CHO ADMIN
+            // XỬ LÝ LƯU KHUÔN MẶT (ENROLL)
             if (data.type === 'ENROLL' && data.descriptor) {
                 setStatus('Đang lưu dữ liệu...');
                 callServer('saveFaceData', data.maNV, data.descriptor).then(res => {
                     setStatus(res.success ? '✅ Đã lưu khuôn mặt thành công!' : '❌ Lỗi: ' + res.message);
                     iframeRef.current?.contentWindow?.postMessage({ type: 'ENROLL_RESULT', success: res.success, message: res.message }, '*');
                     
-                    // ĐOẠN MỚI: Tự động đóng Popup Camera sau 1.5 giây nếu lưu thành công
                     if (res.success) {
+                        // Cập nhật ngay dữ liệu khuôn mặt vào state để UI tự động đổi sang nút Chấm công
+                        const updatedEmployees = employees.map(emp => 
+                            emp.maNV === data.maNV ? { ...emp, face_data: data.descriptor } : emp
+                        );
+                        setEmployees(updatedEmployees);
+                        
                         setTimeout(() => onVerified(), 1500); 
                     }
                 });
             }
             
-            // XỬ LÝ XÁC THỰC CHO SINH VIÊN
+            // XỬ LÝ XÁC THỰC (VERIFY)
             if (data.type === 'VERIFIED') {
                 setStatus('✅ Xác thực thành công! Đang ghi nhận...');
-                setTimeout(() => onVerified(), 1500); // 1.5s sau mới đóng popup để ghi nhận
+                setTimeout(() => onVerified(), 1500); 
             }
             
-            // XỬ LÝ KHI KHÔNG KHỚP
             if (data.type === 'FAILED') {
-                setStatus('❌ Khuôn mặt không khớp! Vui lòng ấn Xác Thực Lại.');
+                setStatus('❌ Khuôn mặt không khớp! Vui lòng ấn Thử Lại.');
             }
         };
         
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [user.maNV, onVerified]);
+    }, [user.maNV, onVerified, employees, setEmployees]);
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#000' }}>
