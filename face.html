@@ -9,7 +9,7 @@
     body { font-family: Inter, sans-serif; background: #f8fafc; display: flex; flex-direction: column; align-items: center; padding: 16px; }
     #status { color: #4338ca; font-weight: 500; text-align: center; margin-bottom: 12px; min-height: 48px; padding: 0 8px; font-size: 14px; }
     #status.error { color: #ef4444; }
-    #video-wrapper { background: #1f2937; border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+    #video-wrapper { background: #1f2937; border-radius: 12px; overflow: hidden; margin-bottom: 16px; position: relative;}
     video { display: block; transform: scaleX(-1); }
     .btn-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
     button { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 14px; }
@@ -21,7 +21,7 @@
 </head>
 <body>
 
-<div id="status">Đang khởi động AI và Camera...</div>
+<div id="status">Đang tải thư viện AI...</div>
 
 <div id="video-wrapper">
   <video id="video" width="320" height="240" autoplay muted playsinline></video>
@@ -36,7 +36,6 @@
 </div>
 
 <script>
-  // Dùng trực tiếp máy chủ gốc của tác giả để đảm bảo 100% không thiếu file
   const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
   
   const video = document.getElementById('video');
@@ -48,15 +47,18 @@
 
   let maNV = '';
   let faceData = null;
+  let userRole = ''; // Biến để nhớ ai đang đăng nhập
 
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'INIT') {
         maNV = e.data.maNV || '';
+        userRole = e.data.role || '';
         faceData = e.data.faceData ? new Float32Array(JSON.parse(e.data.faceData)) : null;
 
-        // ẨN NÚT ĐĂNG KÝ NẾU KHÔNG PHẢI LÀ ADMIN
-        if (e.data.role !== 'ADMIN') {
+        // Nếu là Nhân viên/Sinh viên thì ẩn hết nút bấm đi cho gọn
+        if (userRole !== 'ADMIN') {
             btnEnroll.style.display = 'none';
+            btnVerify.style.display = 'none'; 
         }
     }
 
@@ -91,7 +93,6 @@
 
     try {
       if (!modelsLoaded) {
-        // ĐÃ BỎ LOAD CẢM XÚC ĐỂ APP NHẸ VÀ KHÔNG BỊ LỖI 404
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -99,7 +100,7 @@
         ]);
         modelsLoaded = true;
       }
-      setStatus('Đang yêu cầu quyền Camera...');
+      setStatus('Đang bật Camera...');
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
@@ -109,15 +110,25 @@
       video.srcObject = stream;
       await video.play();
 
-      setStatus('Vui lòng nhìn thẳng vào camera...');
       btnEnroll.disabled = false;
       btnVerify.disabled = false;
+
+      // LOGIC TỰ ĐỘNG QUÉT DÀNH CHO SINH VIÊN/NHÂN VIÊN
+      if (userRole !== 'ADMIN') {
+         setStatus('Đang tự động quét... Vui lòng giữ yên đầu!');
+         // Hẹn giờ 1.5 giây để Camera lấy nét cho nét rồi mới tự động ấn "Xác thực"
+         setTimeout(() => {
+            btnVerify.click();
+         }, 1500);
+      } else {
+         setStatus('Vui lòng nhìn thẳng vào camera...');
+      }
 
     } catch (err) {
       console.error(err);
       btnNormal.style.display = 'none';
       btnError.style.display = 'flex';
-      setStatus('Lỗi hoặc Trình duyệt chặn Camera: ' + err.message, true);
+      setStatus('Lỗi hoặc Trình duyệt chặn Camera.', true);
     }
   }
 
@@ -141,12 +152,10 @@
 
   btnVerify.onclick = async () => {
     if (!faceData) {
-      setStatus('❌ Nhân viên chưa đăng ký khuôn mặt!', true);
+      setStatus('❌ Sinh viên chưa đăng ký khuôn mặt!', true);
       return;
     }
-    setStatus('Đang xác thực...');
-    
-    // Đã bỏ .withFaceExpressions() ở đây
+    setStatus('Đang phân tích khuôn mặt...');
     const det = await faceapi
       .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
@@ -158,15 +167,27 @@
         setStatus('✅ Nhận diện thành công!');
         sendToParent('VERIFIED', { maNV, distance });
       } else {
-        setStatus(`❌ Khuôn mặt không khớp! (Độ lệch: ${distance.toFixed(2)})`, true);
+        setStatus(`❌ Khuôn mặt không khớp! Vui lòng thử lại.`, true);
         sendToParent('FAILED', { maNV, distance });
       }
     } else {
-      setStatus('⚠️ Không tìm thấy khuôn mặt.', true);
+      setStatus('⚠️ Camera không thấy rõ mặt. Vui lòng di chuyển ra chỗ sáng.', true);
+      // Tự động quét lại sau 2 giây nếu không thấy mặt
+      if (userRole !== 'ADMIN') {
+         setTimeout(() => btnVerify.click(), 2000);
+      }
     }
   };
 
-  init();
+  // KHẮC PHỤC LỖI "faceapi is not defined"
+  // Vòng lặp chờ thư viện tải xong 100% rồi mới chạy init()
+  let checkLoad = setInterval(() => {
+     if (typeof faceapi !== 'undefined') {
+         clearInterval(checkLoad);
+         init();
+     }
+  }, 100);
+
 </script>
 </body>
 </html>
