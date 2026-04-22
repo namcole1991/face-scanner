@@ -3000,22 +3000,33 @@ const FaceCheckIn = ({ user, onVerified }) => {
     useEffect(() => {
         const handleMessage = (e) => {
             const data = e.data || {};
+            
+            // XỬ LÝ LƯU KHUÔN MẶT CHO ADMIN
             if (data.type === 'ENROLL' && data.descriptor) {
                 setStatus('Đang lưu dữ liệu...');
                 callServer('saveFaceData', data.maNV, data.descriptor).then(res => {
                     setStatus(res.success ? '✅ Đã lưu khuôn mặt thành công!' : '❌ Lỗi: ' + res.message);
                     iframeRef.current?.contentWindow?.postMessage({ type: 'ENROLL_RESULT', success: res.success, message: res.message }, '*');
+                    
+                    // ĐOẠN MỚI: Tự động đóng Popup Camera sau 1.5 giây nếu lưu thành công
+                    if (res.success) {
+                        setTimeout(() => onVerified(), 1500); 
+                    }
                 });
             }
+            
+            // XỬ LÝ XÁC THỰC CHO SINH VIÊN
             if (data.type === 'VERIFIED') {
                 setStatus('✅ Xác thực thành công! Đang ghi nhận...');
-                setTimeout(() => onVerified(), 1500); // 1.5s sau mới đóng popup để lưu GPS
+                setTimeout(() => onVerified(), 1500); // 1.5s sau mới đóng popup để ghi nhận
             }
+            
+            // XỬ LÝ KHI KHÔNG KHỚP
             if (data.type === 'FAILED') {
                 setStatus('❌ Khuôn mặt không khớp! Vui lòng ấn Xác Thực Lại.');
-                // TUYỆT ĐỐI KHÔNG GỌI onVerified() Ở ĐÂY ĐỂ KHÔNG BỊ THOÁT RA NGOÀI
             }
         };
+        
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, [user.maNV, onVerified]);
@@ -3028,7 +3039,6 @@ const FaceCheckIn = ({ user, onVerified }) => {
                 </Typography>
             )}
             <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
-                {/* Thiết lập width 100%, height 100% để ép iframe ôm sát màn hình điện thoại */}
                 <iframe
                     ref={iframeRef}
                     src={FACE_URL}
