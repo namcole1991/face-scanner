@@ -21,7 +21,7 @@
 </head>
 <body>
 
-<div id="status">Đang khởi động AI và Camera...</div>
+<div id="status">Đang khởi tạo AI...</div>
 
 <div id="video-wrapper">
   <video id="video" width="320" height="240" autoplay muted playsinline></video>
@@ -46,33 +46,31 @@
   let maNV = '';
   let faceData = null; 
 
-  // Cấu hình cho thư viện Human
+  // Cấu hình AI: Trỏ trực tiếp tới CDN của tác giả để tránh lỗi file
   const humanConfig = {
-    modelBasePath: './models', // Gọi thẳng vào thư mục models bạn vừa upload
-    filter: { equalization: true }, // Tự cân bằng sáng nếu phòng hơi tối
+    modelBasePath: 'https://vladmandic.github.io/human/models/', 
     face: {
       enabled: true,
       detector: { return: true, rotation: true },
       mesh: { enabled: true },
-      description: { enabled: true }, // Sinh ra mã nhận diện khuôn mặt
-      antispoof: { enabled: true }, // BẬT TÍNH NĂNG CHỐNG DÙNG ẢNH GIẢ MẠO
+      description: { enabled: true },
+      antispoof: { enabled: true },
       liveness: { enabled: true }
     },
-    body: { enabled: false }, // Tắt nhận diện cơ thể cho nhẹ
-    hand: { enabled: false }, // Tắt nhận diện tay
+    body: { enabled: false },
+    hand: { enabled: false },
     gesture: { enabled: false }
   };
 
-  const human = new Human.Human(humanConfig);
+  const human = new Human(humanConfig);
 
-  // Lắng nghe dữ liệu từ phần mềm Ký Túc Xá (GAS)
+  // Nhận tín hiệu từ React
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'INIT') {
         maNV = e.data.maNV || '';
-        // Khôi phục mảng dữ liệu khuôn mặt cũ
         faceData = e.data.faceData ? Object.values(JSON.parse(e.data.faceData)) : null;
         
-        // Ẩn nút Đăng Ký nếu là Nhân Viên
+        // Ẩn nút đăng ký nếu không phải ADMIN
         if (e.data.role !== 'ADMIN') {
             btnEnroll.style.display = 'none';
         }
@@ -106,7 +104,7 @@
     btnError.style.display = 'none';
 
     try {
-      await human.load(); // Tải model
+      await human.load(); 
       setStatus('Đang yêu cầu quyền Camera...');
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -117,29 +115,24 @@
       video.srcObject = stream;
       await video.play();
 
-      // Khởi động trước model bằng 1 khung hình ảo để lúc ấn nút sẽ mượt
-      await human.detect(video);
-
-      setStatus('Vui lòng nhìn thẳng vào camera...');
-      btnEnroll.disabled = false;
-      btnVerify.disabled = false;
+      // Phải đợi video có dữ liệu mới cho AI đọc để tránh lỗi 'inputs'
+      video.onloadeddata = async () => {
+         await human.detect(video);
+         setStatus('Vui lòng nhìn thẳng vào camera...');
+         btnEnroll.disabled = false;
+         btnVerify.disabled = false;
+      };
 
     } catch (err) {
       console.error(err);
       btnNormal.style.display = 'none';
       btnError.style.display = 'flex';
-
-      if (err.name === 'NotAllowedError') {
-        setStatus('Trình duyệt chặn Camera. Vui lòng ấn vào ổ khóa 🔒 cấp quyền.', true);
-      } else {
-        setStatus('Lỗi: ' + err.message, true);
-      }
+      setStatus('Lỗi hoặc Trình duyệt chặn Camera.', true);
     }
   }
 
   document.getElementById('btnRetry').onclick = init;
 
-  // Hàm quét gom gọn cho cả 2 nút
   async function getFaceData() {
      const result = await human.detect(video);
      if (result.face && result.face.length > 0) {
@@ -148,9 +141,8 @@
      return null;
   }
 
-  // NÚT ĐĂNG KÝ (Chỉ Admin thấy)
   btnEnroll.onclick = async () => {
-    setStatus('Đang phân tích khuôn mặt để đăng ký...');
+    setStatus('Đang phân tích khuôn mặt...');
     const face = await getFaceData();
 
     if (face && face.embedding) {
@@ -158,14 +150,13 @@
       sendToParent('ENROLL', { maNV, descriptor: descriptorStr });
       setStatus('✅ Đã gửi dữ liệu khuôn mặt để lưu!');
     } else {
-      setStatus('⚠️ Không tìm thấy khuôn mặt rõ nét. Hãy nhìn thẳng và thử lại.', true);
+      setStatus('⚠️ Không tìm thấy khuôn mặt rõ nét.', true);
     }
   };
 
-  // NÚT XÁC THỰC
   btnVerify.onclick = async () => {
     if (!faceData || faceData.length === 0) {
-      setStatus('❌ Chưa có dữ liệu khuôn mặt trên máy chủ!', true);
+      setStatus('❌ Sinh viên chưa đăng ký khuôn mặt!', true);
       return;
     }
 
@@ -173,25 +164,22 @@
     const face = await getFaceData();
 
     if (face && face.embedding) {
-      // 1. Kiểm tra ảnh giả mạo (Anti-spoofing)
       if (face.real < 0.5) {
-         setStatus('❌ Phát hiện ảnh giả mạo/chụp lại! Vui lòng dùng người thật.', true);
+         setStatus('❌ Phát hiện ảnh giả mạo! Vui lòng dùng người thật.', true);
          return;
       }
 
-      // 2. Tính toán độ giống nhau
       const match = human.match(face.embedding, faceData);
       
-      // Độ giống nhau > 0.55 được coi là khớp
       if (match.similarity > 0.55) {
-        setStatus(`✅ Nhận diện thành công! (Khớp ${(match.similarity * 100).toFixed(0)}%)`);
+        setStatus(`✅ Xác thực thành công! (${(match.similarity * 100).toFixed(0)}%)`);
         sendToParent('VERIFIED', { maNV, distance: match.distance });
       } else {
-        setStatus(`❌ Khuôn mặt không khớp! (Độ giống: ${(match.similarity * 100).toFixed(0)}%)`, true);
+        setStatus(`❌ Khuôn mặt không khớp! (${(match.similarity * 100).toFixed(0)}%)`, true);
         sendToParent('FAILED', { maNV, distance: match.distance });
       }
     } else {
-      setStatus('⚠️ Không tìm thấy khuôn mặt trong khung hình.', true);
+      setStatus('⚠️ Không tìm thấy khuôn mặt.', true);
     }
   };
 
