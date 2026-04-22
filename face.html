@@ -10,14 +10,16 @@
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
     
     #video-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    /* Tăng độ sáng và độ tương phản của Camera lên 15% để AI nhìn rõ hơn */
+    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); filter: brightness(1.15) contrast(1.05); }
     
-    #guide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; background: rgba(0,0,0,0.4); transition: background 0.3s; }
+    /* ĐÃ XÓA LỚP NỀN ĐEN PHỦ LÊN MÀN HÌNH Ở ĐÂY */
+    #guide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; }
     
-    /* Vòng tròn hướng dẫn đã được làm cho responsive (co giãn theo màn hình) */
-    #guide-reticle { width: 70vw; max-width: 280px; aspect-ratio: 3/4; height: auto; border: 3px dashed rgba(255,255,255,0.6); border-radius: 50%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); transition: all 0.3s ease; }
-    #guide-reticle.active { border-color: #10b981; border-style: solid; box-shadow: 0 0 20px rgba(16,185,129,0.5), 0 0 0 9999px rgba(0,0,0,0.6); transform: scale(1.02); }
-    #guide-reticle.error { border-color: #ef4444; border-style: solid; box-shadow: 0 0 20px rgba(239,68,68,0.5), 0 0 0 9999px rgba(0,0,0,0.6); }
+    /* Vòng tròn giữ nguyên độ tối mờ ở XUNG QUANH (box-shadow), nhưng TRONG SUỐT HOÀN TOÀN ở giữa */
+    #guide-reticle { width: 70vw; max-width: 280px; aspect-ratio: 3/4; height: auto; border: 3px dashed rgba(255,255,255,0.8); border-radius: 50%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.65); transition: all 0.3s ease; }
+    #guide-reticle.active { border-color: #10b981; border-style: solid; box-shadow: 0 0 20px rgba(16,185,129,0.5), 0 0 0 9999px rgba(0,0,0,0.65); transform: scale(1.02); }
+    #guide-reticle.error { border-color: #ef4444; border-style: solid; box-shadow: 0 0 20px rgba(239,68,68,0.5), 0 0 0 9999px rgba(0,0,0,0.65); }
 
     #status-bar { position: absolute; top: 5%; left: 50%; transform: translateX(-50%); width: 90%; max-width: 340px; background: rgba(31, 41, 55, 0.95); backdrop-filter: blur(8px); padding: 14px 16px; border-radius: 12px; text-align: center; font-weight: 600; font-size: 15px; z-index: 3; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s; }
     #status-bar.warning { background: #fffbeb; color: #b45309; border-color: #fde68a; }
@@ -107,7 +109,6 @@
       
       setStatus('Đang mở Camera...', 'warning');
       
-      // BỎ ÉP KÍCH THƯỚC ĐỂ TRÁNH TRÌNH DUYỆT ZOOM (CROP) CAMERA
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' }, 
         audio: false
@@ -157,7 +158,6 @@
             return;
         } 
         
-        // NỚI LỎNG TỶ LỆ: KHUÔN MẶT CHIẾM 85% MÀN HÌNH VẪN QUÉT ĐƯỢC
         if (ratio > 0.85) {
             setStatus('🤚 Hãy đưa camera RA XA một chút', 'warning');
             reticleEl.className = '';
