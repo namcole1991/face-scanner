@@ -2386,7 +2386,7 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
             );
         };
 
-        // --- GPS SETTINGS COMPONENT (ADMIN) ---
+// --- GPS SETTINGS COMPONENT (ADMIN) ---
         const GPSSettings = () => {
             const [form, setForm] = useState({ latitude: '', longitude: '', radius: 200, address: '' });
             const [loading, setLoading] = useState(true);
@@ -2456,8 +2456,9 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                 });
             };
 
+            // ĐÃ SỬA LẠI ĐƯỜNG LINK GOOGLE MAPS CHUẨN
             const mapUrl = form.latitude && form.longitude
-                ? `https://maps.google.com/maps?q=${form.latitude},${form.longitude}&z=17&output=embed`
+                ? `https://maps.google.com/maps?q=${form.latitude},${form.longitude}&hl=vi&z=16&output=embed`
                 : null;
 
             if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}><CircularProgress /></Box>;
@@ -2575,14 +2576,18 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                         <Grid item xs={12} md={7}>
                             <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: 2, height: '100%', minHeight: { xs: 280, md: 450 } }}>
                                 {mapUrl ? (
-                                    <Box sx={{ position: 'relative', height: '100%' }}>
+                                    <Box sx={{ position: 'relative', height: '100%', minHeight: 400 }}>
+                                        {/* ĐÃ SỬA LẠI SRC CỦA IFRAME ĐỂ HIỂN THỊ BẢN ĐỒ */}
                                         <iframe 
-    src="https://script.google.com/macros/s/AKfycbxmfBEq7A4pVPTlgyXTXNlVel-OLpCF77WNzBLLdFdlIjQKCP3kWLXMGoNBEq35_61p/exec" 
-    width="100%" 
-    height="800px" 
-    frameborder="0"
-    allow="camera; microphone; autoplay; fullscreen" 
-></iframe>
+                                            src={mapUrl} 
+                                            width="100%" 
+                                            height="100%" 
+                                            frameBorder="0"
+                                            style={{ border: 0, minHeight: '450px' }}
+                                            allowFullScreen=""
+                                            aria-hidden="false"
+                                            tabIndex="0"
+                                        ></iframe>
                                         <Box sx={{
                                             position: 'absolute', bottom: { xs: 8, md: 16 }, left: { xs: 8, md: 16 }, right: { xs: 8, md: 'auto' },
                                             bgcolor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(4px)',
