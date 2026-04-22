@@ -3,101 +3,90 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Face Scanner - Guided & Responsive</title>
+  <title>Face Scanner Auto</title>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; padding: 16px; color: #1c1e21; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; color: #fff; }
     
-    /* Responsive Status Bar */
-    #status { width: 100%; max-width: 400px; color: #4338ca; font-weight: 600; text-align: center; margin-bottom: 16px; min-height: 54px; padding: 10px 16px; font-size: 15px; background: #fff; border-radius: 12px; boxShadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center;}
-    #status.error { color: #ef4444; background: #fef2f2; border: 1px solid #fecaca; }
-    #status.success { color: #059669; background: #ecfdf5; border: 1px solid #a7f3d0; }
-    #status.warning { color: #b45309; background: #fffbeb; border: 1px solid #fde68a; }
+    /* Vùng chứa Video tràn viền gọn gàng */
+    #video-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); /* Soi gương */ }
+    
+    /* Khung hướng dẫn (Reticle) */
+    #guide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; background: rgba(0,0,0,0.4); transition: background 0.3s; }
+    #guide-overlay.clear { background: transparent; }
+    
+    #guide-reticle { width: 250px; height: 350px; border: 3px dashed rgba(255,255,255,0.6); border-radius: 50%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); transition: all 0.3s ease; }
+    #guide-reticle.active { border-color: #10b981; border-style: solid; box-shadow: 0 0 20px rgba(16,185,129,0.5), 0 0 0 9999px rgba(0,0,0,0.6); transform: scale(1.02); }
+    #guide-reticle.error { border-color: #ef4444; border-style: solid; box-shadow: 0 0 20px rgba(239,68,68,0.5), 0 0 0 9999px rgba(0,0,0,0.6); }
 
-    /* Responsive Video Wrapper - Cân đối trên mobile */
-    #video-wrapper { width: 100%; max-width: 400px; aspect-ratio: 3/4; /* Tỷ lệ khung hình portrait phù hợp mobile */ background: #000; border-radius: 16px; overflow: hidden; margin-bottom: 20px; position: relative; boxShadow: 0 8px 30px rgba(0,0,0,0.15); border: 4px solid #fff; }
-    video { width: 100%; height: 100%; object-fit: cover; /* Tràn viền khung wrapper */ transform: scaleX(-1); /* Mirror view */ }
-    
-    /* Vùng hướng dẫn trực quan trên Video */
-    #guide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-    #guide-reticle { width: 60%; height: 50%; border: 2px dashed rgba(255,255,255,0.5); border-radius: 50%; transition: all 0.3s ease; }
-    #guide-reticle.active { border-color: #3b82f6; border-style: solid; background: rgba(59,130,246,0.05); border-width: 3px; }
-    #guide-reticle.match { border-color: #10b981; border-style: solid; background: rgba(16,185,129,0.05); border-width: 3px; }
+    /* Thanh thông báo nổi phía trên */
+    #status-bar { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 320px; background: rgba(31, 41, 55, 0.9); backdrop-filter: blur(8px); padding: 12px 16px; border-radius: 12px; text-align: center; font-weight: 600; font-size: 15px; z-index: 3; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s; }
+    #status-bar.warning { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+    #status-bar.success { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+    #status-bar.error { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
 
-    /* Button Layout */
-    .btn-row { width: 100%; max-width: 400px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: auto; padding-bottom: 20px;}
-    button { padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; font-size: 15px; transition: all 0.2s ease; display: flex; align-items: center; gap: 8px; justify-content: center; flex: 1; min-width: 140px;}
-    button:active { transform: translateY(1px); filter: brightness(0.9); }
+    /* Giao diện nút bấm phía dưới */
+    #action-area { position: absolute; bottom: 30px; left: 0; width: 100%; display: flex; justify-content: center; gap: 12px; z-index: 3; padding: 0 20px; }
+    button { padding: 14px 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; font-size: 15px; width: 100%; max-width: 250px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform 0.1s; }
+    button:active { transform: scale(0.96); }
     
-    #btnEnroll { background: #fff; color: #1d4ed8; border: 1px solid #bfdbfe; boxShadow: 0 2px 4px rgba(29,78,216,0.1); }
-    #btnVerify { background: linear-gradient(135deg,#60a5fa,#3b82f6); color: #fff; boxShadow: 0 4px 12px rgba(59,130,246,0.3); }
-    #btnRetry { background: linear-gradient(135deg,#f59e0b,#d97706); color: #fff; boxShadow: 0 4px 12px rgba(217,119,6,0.3); }
-    
-    button:disabled { opacity: 0.5; cursor: not-allowed; boxShadow: none !important; }
+    #btnEnroll { background: #fff; color: #1d4ed8; }
+    #btnRetry { background: #ef4444; color: #fff; display: none; }
     .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
-<div id="status">Đang tải cấu hình AI...</div>
+<div id="status-bar">Đang tải cấu hình AI...</div>
 
 <div id="video-wrapper">
   <video id="video" autoplay muted playsinline></video>
-  <div id="guide-overlay">
-    <div id="guide-reticle"></div>
-  </div>
 </div>
 
-<div class="btn-row" id="area-normal">
-  <button id="btnEnroll" disabled><span class="material-icons">add_a_photo</span>Đăng ký</button>
-  <button id="btnVerify" disabled><span class="material-icons">fact_check</span>Xác thực</button>
+<div id="guide-overlay">
+  <div id="guide-reticle"></div>
 </div>
 
-<div class="btn-row hidden" id="area-retry">
-  <button id="btnRetry"><span class="material-icons">cached</span>Xác thực lại</button>
+<div id="action-area">
+  <button id="btnEnroll" class="hidden">Đăng Ký Khuôn Mặt</button>
+  <button id="btnRetry">Quét Lại</button>
 </div>
 
 <script>
-  // Link models gốc ổn định
+  // Trỏ về server gốc của face-api để đảm bảo ổn định
   const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
   
   const video = document.getElementById('video');
-  const statusEl = document.getElementById('status');
+  const statusEl = document.getElementById('status-bar');
   const reticleEl = document.getElementById('guide-reticle');
-  const areaNormal = document.getElementById('area-normal');
-  const areaRetry = document.getElementById('area-retry');
-  
   const btnEnroll = document.getElementById('btnEnroll');
-  const btnVerify = document.getElementById('btnVerify');
   const btnRetry = document.getElementById('btnRetry');
 
   let maNV = '';
   let faceData = null;
   let userRole = '';
+  
   let modelsLoaded = false;
-  let guidanceInterval = null; // Quản lý vòng lặp hướng dẫn
-  let isProcessing = false; // Chống click nhiều lần
+  let guidanceInterval = null; 
+  let isVerifying = false; 
+  let goodFrames = 0; // Đếm số khung hình đạt chuẩn liên tiếp
 
-  // Nghe lệnh từ App Script
+  // Giao tiếp với Iframe cha
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'INIT') {
         maNV = e.data.maNV || '';
         userRole = e.data.role || '';
         faceData = e.data.faceData ? new Float32Array(JSON.parse(e.data.faceData)) : null;
-        if (userRole !== 'ADMIN') btnEnroll.classList.add('hidden');
-    }
-    if (e.data && e.data.type === 'ENROLL_RESULT') {
-        isProcessing = false;
-        if (e.data.success) {
-            setStatus('✅ Đã lưu khuôn mặt!', 'success');
-        } else {
-            setStatus('❌ Lỗi: ' + e.data.message, 'error');
+
+        // Chỉ hiển thị nút Đăng ký nếu là ADMIN
+        if (userRole === 'ADMIN') {
+            btnEnroll.classList.remove('hidden');
         }
     }
   });
 
-  // Báo tin cho App Script là iframe đã sẵn sàng
   window.addEventListener('load', () => {
     window.parent.postMessage({ type: 'IFRAME_READY' }, '*');
   });
@@ -108,16 +97,12 @@
 
   function setStatus(msg, type = '') {
     statusEl.textContent = msg;
-    statusEl.className = type; // '', 'error', 'success', 'warning'
+    statusEl.className = type; // 'warning', 'success', 'error'
   }
 
-  // Khởi tạo AI và Camera
+  // Khởi động
   async function init() {
-    setStatus('Đang tải cấu hình AI...');
-    areaNormal.classList.remove('hidden');
-    areaRetry.classList.add('hidden');
-    reticleEl.className = '';
-
+    setStatus('Đang tải AI...', 'warning');
     try {
       if (!modelsLoaded) {
         await Promise.all([
@@ -127,167 +112,143 @@
         ]);
         modelsLoaded = true;
       }
-      setStatus('Đang bật camera...');
-
+      
+      setStatus('Đang mở Camera...', 'warning');
       const stream = await navigator.mediaDevices.getUserMedia({
-        // Tối ưu camera cho portrait mode trên mobile
-        video: { 
-            width: { ideal: 400 }, 
-            height: { ideal: 533 }, 
-            facingMode: 'user' 
-        },
+        video: { facingMode: 'user' },
         audio: false
       });
-
       video.srcObject = stream;
-      
-      // Chờ video loaded để lấy kích thước thật
-      await new Promise((resolve) => video.onloadedmetadata = resolve);
       await video.play();
 
-      btnEnroll.disabled = false;
-      btnVerify.disabled = false;
-      setStatus('Vui lòng nhìn thẳng vào camera...');
+      setStatus('Vui lòng đưa mặt vào khung hình', '');
       
-      // BẮT ĐẦU VÒNG LẶP HƯỚNG DẪN USER (GUIDED AUTH)
-      startGuidanceLoop();
+      // Nếu là Sinh viên/Nhân viên -> Tự động chạy luồng quét mặt
+      if (userRole !== 'ADMIN') {
+         startAutoScan();
+      }
 
     } catch (err) {
-      setStatus('Lỗi: Trình duyệt chặn Camera.', 'error');
+      setStatus('Lỗi: Trình duyệt chặn Camera!', 'error');
     }
   }
 
-  // Phân tích khuôn mặt theo thời gian thực để hướng dẫn
-  function startGuidanceLoop() {
+  // --- VÒNG LẶP HƯỚNG DẪN & TỰ ĐỘNG XÁC THỰC ---
+  function startAutoScan() {
+    isVerifying = false;
+    goodFrames = 0;
+    reticleEl.className = '';
+    btnRetry.style.display = 'none';
+
     if(guidanceInterval) clearInterval(guidanceInterval);
     
     guidanceInterval = setInterval(async () => {
-        if (isProcessing) return; // Không phân tích khi đang xác thực
+        if (isVerifying) return;
 
-        const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
+        const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
 
         if (!det) {
-            setStatus('⚠️ Không tìm thấy khuôn mặt.', 'warning');
+            setStatus('👀 Không tìm thấy khuôn mặt', 'warning');
             reticleEl.className = '';
+            goodFrames = 0;
             return;
         }
 
-        // 1. Phân tích khoảng cách (dựa trên kích thước box)
-        const videoWidth = video.videoWidth;
-        const faceWidth = det.detection.box.width;
-        const faceRatio = faceWidth / videoWidth;
+        // 1. Phân tích khoảng cách
+        const videoW = video.videoWidth || 320;
+        const faceW = det.detection.box.width;
+        const ratio = faceW / videoW;
 
-        if (faceRatio < 0.25) {
-            setStatus('👋 Vui lòng đưa camera LẠI GẦN hơn.', 'warning');
+        if (ratio < 0.25) {
+            setStatus('👋 Hãy đưa camera LẠI GẦN hơn', 'warning');
             reticleEl.className = '';
+            goodFrames = 0;
             return;
         } 
-        if (faceRatio > 0.7) {
-            setStatus('🤚 Vui lòng đưa camera RA XA hơn.', 'warning');
+        if (ratio > 0.65) {
+            setStatus('🤚 Hãy đưa camera RA XA một chút', 'warning');
             reticleEl.className = '';
+            goodFrames = 0;
             return;
         }
 
-        // 2. Phân tích độ sáng (mẹo dựa trên score của detector)
-        if (det.detection.score < 0.5) {
-            setStatus('💡 Ánh sáng tối. Vui lòng di chuyển ra chỗ sáng.', 'warning');
+        // 2. Phân tích độ sáng / độ nét
+        if (det.detection.score < 0.6) {
+            setStatus('💡 Ánh sáng tối hoặc mặt bị che. Vui lòng bỏ khẩu trang.', 'warning');
             reticleEl.className = '';
+            goodFrames = 0;
             return;
         }
 
-        // 3. Phân tích góc nhìn (dựa trên landmarks)
-        const landmarks = det.landmarks;
-        const nose = landmarks.getNose();
-        const jawline = landmarks.getJawOutline();
-        // Tính toán đơn giản xem mũi có nằm giữa cằm không
-        const jawWidth = faceapi.euclideanDistance(jawline[0], jawline[16]);
-        const noseToJawLeft = faceapi.euclideanDistance(nose[0], jawline[0]);
-        const noseRatio = noseToJawLeft / jawWidth;
-
-        if (noseRatio < 0.3 || noseRatio > 0.7) {
-            setStatus('👤 Vui lòng nhìn THẲNG vào camera.', 'warning');
-            reticleEl.className = '';
-            return;
-        }
-
-        // TẤT CẢ ĐIỀU KIỆN ĐẠT CHUẨN
-        setStatus('✅ Vị trí tốt. Bấm nút để xác thực.', 'success');
+        // --- NẾU ĐẠT CHUẨN ---
+        goodFrames++;
         reticleEl.className = 'active';
+        
+        if (goodFrames === 1) setStatus('✅ Giữ yên khuôn mặt...', 'success');
+        if (goodFrames === 2) setStatus('✅ Đang xử lý...', 'success');
 
-    }, 400); // Phân tích mỗi 0.4 giây
+        // Giữ yên khoảng 3 nhịp (tương đương gần 1 giây) để chống rung nhòe ảnh
+        if (goodFrames >= 3) {
+            clearInterval(guidanceInterval);
+            executeVerification(det.descriptor);
+        }
+
+    }, 300); // Quét 0.3s một lần
   }
 
-  // --- NÚT ĐĂNG KÝ (ADMIN) ---
+  // --- THỰC THI XÁC THỰC ---
+  async function executeVerification(currentDescriptor) {
+      isVerifying = true;
+      setStatus('⏳ Đang kiểm tra dữ liệu...', 'warning');
+
+      if (!faceData) {
+          setStatus('❌ Bạn chưa được đăng ký khuôn mặt!', 'error');
+          reticleEl.className = 'error';
+          btnRetry.style.display = 'block';
+          return;
+      }
+
+      // Tính khoảng cách Euclidean
+      const distance = faceapi.euclideanDistance(currentDescriptor, faceData);
+      
+      if (distance < 0.55) {
+          setStatus('✅ Nhận diện thành công!', 'success');
+          reticleEl.className = 'active';
+          sendToParent('VERIFIED', { maNV, distance });
+          // Tắt camera
+          video.srcObject.getTracks().forEach(track => track.stop());
+      } else {
+          setStatus('❌ Khuôn mặt không khớp! Vui lòng thử lại.', 'error');
+          reticleEl.className = 'error';
+          sendToParent('FAILED', { maNV, distance });
+          // Hiện nút thử lại
+          btnRetry.style.display = 'block';
+      }
+  }
+
+  // Nút Thử lại
+  btnRetry.onclick = () => {
+      setStatus('Vui lòng đưa mặt vào khung hình', '');
+      startAutoScan();
+  };
+
+  // Nút Đăng ký (Dành cho Admin)
   btnEnroll.onclick = async () => {
-    if(!modelsLoaded || isProcessing) return;
-    isProcessing = true;
-    setStatus('Đang quét khuôn mặt...');
-    reticleEl.className = '';
-    
+    btnEnroll.disabled = true;
+    setStatus('Đang chụp ảnh...', 'warning');
     const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
 
     if (det) {
       const descriptorStr = JSON.stringify(Array.from(det.descriptor));
       sendToParent('ENROLL', { maNV, descriptor: descriptorStr });
-      setStatus('Đang gửi dữ liệu...');
+      setStatus('✅ Đã lưu khuôn mặt!', 'success');
     } else {
-      isProcessing = false;
-      setStatus('⚠️ Không quét được. Hãy thử lại.', 'error');
+      setStatus('⚠️ Không tìm thấy khuôn mặt rõ nét.', 'error');
     }
+    setTimeout(() => btnEnroll.disabled = false, 2000);
   };
 
-  // --- NÚT XÁC THỰC ---
-  btnVerify.onclick = async () => {
-    if (!faceData) {
-      setStatus('❌ Bạn chưa đăng ký khuôn mặt!', 'error');
-      return;
-    }
-    if(!modelsLoaded || isProcessing) return;
-    
-    isProcessing = true;
-    setStatus('Đang phân tích...');
-    clearInterval(guidanceInterval); // Dừng hướng dẫn
-    reticleEl.className = '';
-
-    const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-
-    if (det) {
-      const distance = faceapi.euclideanDistance(det.descriptor, faceData);
-      // Ngưỡng 0.55 là độ nhạy vừa phải
-      if (distance < 0.55) {
-        setStatus('✅ Nhận diện thành công!', 'success');
-        reticleEl.className = 'match';
-        sendToParent('VERIFIED', { maNV, distance });
-        // Tắt camera sau khi thành công
-        const stream = video.srcObject;
-        if(stream) stream.getTracks().forEach(track => track.stop());
-      } else {
-        // XỬ LÝ KHI KHÔNG KHỚP
-        setStatus(`❌ Không phải khuôn mặt bạn! (Độ lệch: ${distance.toFixed(2)})`, 'error');
-        sendToParent('FAILED', { maNV, distance });
-        
-        // HIỂN THỊ NÚT XÁC THỰC LẠI
-        areaNormal.classList.add('hidden');
-        areaRetry.classList.remove('hidden');
-        isProcessing = false;
-      }
-    } else {
-      isProcessing = false;
-      setStatus('⚠️ Không thấy rõ mặt. Hãy thử lại.', 'error');
-      startGuidanceLoop(); // Bật lại hướng dẫn
-    }
-  };
-
-  // --- NÚT XÁC THỰC LẠI ---
-  btnRetry.onclick = () => {
-    // Reset lại trạng thái ban đầu
-    areaNormal.classList.remove('hidden');
-    areaRetry.classList.add('hidden');
-    setStatus('Vui lòng nhìn thẳng vào camera...');
-    startGuidanceLoop(); // Bật lại vòng lặp hướng dẫn
-  };
-
-  // Chờ thư viện load xong rồi mới chạy
+  // Chờ thư viện load xong
   let checkLoad = setInterval(() => {
      if (typeof faceapi !== 'undefined') {
          clearInterval(checkLoad);
