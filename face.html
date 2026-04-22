@@ -34,18 +34,9 @@
 <body>
 
 <div id="status-bar">Đang tải cấu hình AI...</div>
-
-<div id="video-wrapper">
-  <video id="video" autoplay muted playsinline></video>
-</div>
-
-<div id="guide-overlay">
-  <div id="guide-reticle"></div>
-</div>
-
-<div id="action-area">
-  <button id="btnRetry" type="button" class="hidden">🔄 Thử Lại</button>
-</div>
+<div id="video-wrapper"><video id="video" autoplay muted playsinline></video></div>
+<div id="guide-overlay"><div id="guide-reticle"></div></div>
+<div id="action-area"><button id="btnRetry" type="button" class="hidden">🔄 Thử Lại</button></div>
 
 <script>
   const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
@@ -57,21 +48,21 @@
 
   let maNV = '';
   let faceData = null;
-  let userRole = '';
+  let workMode = 'VERIFY'; // Mặc định là xác thực
   
   let modelsLoaded = false;
   let guidanceInterval = null; 
-  let isProcessing = false; // Biến khóa trạng thái chung (cho cả Enroll và Verify)
+  let isProcessing = false; 
   let goodFrames = 0; 
 
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'INIT') {
         maNV = e.data.maNV || '';
-        userRole = e.data.role || '';
+        // Đọc mode truyền vào: ENROLL hoặc VERIFY
+        workMode = e.data.mode || 'VERIFY';
         faceData = e.data.faceData ? new Float32Array(JSON.parse(e.data.faceData)) : null;
     }
 
-    // Lắng nghe kết quả ĐĂNG KÝ MẶT TỪ BACKEND TRẢ VỀ
     if (e.data && e.data.type === 'ENROLL_RESULT') {
         if (e.data.success) {
             setStatus('✅ Đã lưu khuôn mặt vào hệ thống!', 'success');
@@ -79,30 +70,15 @@
         } else {
             setStatus('❌ Lỗi lưu: ' + e.data.message, 'error');
             reticleEl.className = 'error';
-            btnRetry.classList.remove('hidden'); // Cho phép thử lại
+            btnRetry.classList.remove('hidden'); 
         }
     }
   });
 
-  window.addEventListener('load', () => {
-    window.parent.postMessage({ type: 'IFRAME_READY' }, '*');
-  });
-
-  function sendToParent(type, payload) {
-    window.parent.postMessage({ type, ...payload }, '*');
-  }
-
-  function setStatus(msg, type = '') {
-    statusEl.textContent = msg;
-    statusEl.className = type; 
-  }
-  
-  function stopCamera() {
-      const stream = video.srcObject;
-      if (stream) stream.getTracks().forEach(track => track.stop());
-  }
-
-  // Hàm tính khoảng cách giữa 2 điểm (dùng để đo góc nghiêng khuôn mặt)
+  window.addEventListener('load', () => window.parent.postMessage({ type: 'IFRAME_READY' }, '*'));
+  function sendToParent(type, payload) { window.parent.postMessage({ type, ...payload }, '*'); }
+  function setStatus(msg, type = '') { statusEl.textContent = msg; statusEl.className = type; }
+  function stopCamera() { const stream = video.srcObject; if (stream) stream.getTracks().forEach(track => track.stop()); }
   const getDistance = (p1, p2) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 
   async function init() {
@@ -118,16 +94,11 @@
       }
       
       setStatus('Đang mở Camera...', 'warning');
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' }, 
-        audio: false
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       video.srcObject = stream;
       await video.play();
 
       setStatus('Vui lòng đưa mặt vào khung hình', '');
-      
-      // Khởi động luồng tự động quét cho TẤT CẢ mọi người (Admin & SV)
       startAutoScan();
 
     } catch (err) {
@@ -155,42 +126,22 @@
             return;
         }
 
-        // 1. Phân tích Khoảng Cách
         const videoW = video.videoWidth || 320;
         const faceW = det.detection.box.width;
         const ratio = faceW / videoW;
 
-        if (ratio < 0.20) {
-            setStatus('👋 Hãy đưa camera LẠI GẦN hơn', 'warning');
-            reticleEl.className = '';
-            goodFrames = 0;
-            return;
-        } 
-        if (ratio > 0.85) {
-            setStatus('🤚 Hãy đưa camera RA XA một chút', 'warning');
-            reticleEl.className = '';
-            goodFrames = 0;
-            return;
-        }
+        if (ratio < 0.20) { setStatus('👋 Hãy đưa camera LẠI GẦN hơn', 'warning'); reticleEl.className = ''; goodFrames = 0; return; } 
+        if (ratio > 0.85) { setStatus('🤚 Hãy đưa camera RA XA một chút', 'warning'); reticleEl.className = ''; goodFrames = 0; return; }
 
-        // 2. Phân tích Ánh Sáng / Bị che
-        if (det.detection.score < 0.6) {
-            setStatus('💡 Ánh sáng tối hoặc mặt bị che.', 'warning');
-            reticleEl.className = '';
-            goodFrames = 0;
-            return;
-        }
+        if (det.detection.score < 0.6) { setStatus('💡 Ánh sáng tối hoặc mặt bị che.', 'warning'); reticleEl.className = ''; goodFrames = 0; return; }
 
-        // 3. Phân tích Độ Nghiêng (Khuôn mặt có đang nhìn thẳng không?)
         const landmarks = det.landmarks;
         const nose = landmarks.getNose();
         const jawline = landmarks.getJawOutline();
-        // Tính bề ngang của viền hàm và vị trí của mũi so với 2 mép hàm
         const jawWidth = getDistance(jawline[0], jawline[16]);
         const noseToJawLeft = getDistance(nose[0], jawline[0]);
         const noseRatio = noseToJawLeft / jawWidth;
 
-        // Tỷ lệ chuẩn khi nhìn thẳng là khoảng 0.5 (Mũi nằm giữa). Cho phép sai số từ 0.35 đến 0.65
         if (noseRatio < 0.35 || noseRatio > 0.65) {
             setStatus('👤 Vui lòng nhìn THẲNG vào camera', 'warning');
             reticleEl.className = '';
@@ -198,7 +149,6 @@
             return;
         }
 
-        // --- NẾU ĐẠT TẤT CẢ CHUẨN ---
         goodFrames++;
         reticleEl.className = 'active';
         
@@ -209,8 +159,8 @@
             clearInterval(guidanceInterval);
             isProcessing = true;
             
-            // PHÂN NHÁNH XỬ LÝ TỰ ĐỘNG DỰA VÀO QUYỀN
-            if (userRole === 'ADMIN') {
+            // PHÂN NHÁNH XỬ LÝ THEO CHẾ ĐỘ (MODE)
+            if (workMode === 'ENROLL') {
                 executeAutoEnroll(det.descriptor);
             } else {
                 executeAutoVerify(det.descriptor);
@@ -219,23 +169,19 @@
     }, 300); 
   }
 
-  // --- TỰ ĐỘNG ĐĂNG KÝ (DÀNH CHO ADMIN) ---
+  // --- TỰ ĐỘNG ĐĂNG KÝ (DÙNG CHO ADMIN VÀ SV LẦN ĐẦU) ---
   async function executeAutoEnroll(descriptor) {
       setStatus('⏳ Đang tạo mã sinh trắc...', 'warning');
       const descriptorStr = JSON.stringify(Array.from(descriptor));
-      
-      // Gửi dữ liệu về cho React để lưu
       sendToParent('ENROLL', { maNV, descriptor: descriptorStr });
-      setStatus('Đang tải dữ liệu lên máy chủ...');
-      // Chờ phản hồi ENROLL_RESULT để thông báo thành công
+      setStatus('Đang lưu dữ liệu lên hệ thống...');
   }
 
-  // --- TỰ ĐỘNG XÁC THỰC (DÀNH CHO SINH VIÊN) ---
+  // --- TỰ ĐỘNG XÁC THỰC (DÙNG KHI CHẤM CÔNG) ---
   async function executeAutoVerify(currentDescriptor) {
       setStatus('⏳ Đang đối chiếu dữ liệu...', 'warning');
-
       if (!faceData) {
-          setStatus('❌ Bạn chưa được đăng ký khuôn mặt!', 'error');
+          setStatus('❌ Dữ liệu lỗi! Bạn chưa có khuôn mặt.', 'error');
           reticleEl.className = 'error';
           btnRetry.classList.remove('hidden');
           return;
@@ -256,21 +202,18 @@
       }
   }
 
-  // NÚT THỬ LẠI (Dùng chung cho cả lỗi đăng ký và lỗi xác thực)
   btnRetry.onclick = () => {
       btnRetry.classList.add('hidden'); 
       setStatus('Vui lòng đưa mặt vào khung hình', '');
       startAutoScan(); 
   };
 
-  // Khởi chạy khi thư viện đã sẵn sàng
   let checkLoad = setInterval(() => {
      if (typeof faceapi !== 'undefined') {
          clearInterval(checkLoad);
          init();
      }
   }, 100);
-
 </script>
 </body>
 </html>
