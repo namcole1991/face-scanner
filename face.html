@@ -7,31 +7,29 @@
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    /* CẤM CUỘN, TRÀN VIỀN 100% */
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
     
     #video-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
     video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
     
-    #guide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; background: rgba(0,0,0,0.5); transition: background 0.3s; }
+    #guide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; background: rgba(0,0,0,0.4); transition: background 0.3s; }
     
-    #guide-reticle { width: 280px; height: 380px; border: 3px dashed rgba(255,255,255,0.6); border-radius: 50%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.7); transition: all 0.3s ease; }
-    #guide-reticle.active { border-color: #10b981; border-style: solid; box-shadow: 0 0 20px rgba(16,185,129,0.5), 0 0 0 9999px rgba(0,0,0,0.7); transform: scale(1.02); }
-    #guide-reticle.error { border-color: #ef4444; border-style: solid; box-shadow: 0 0 20px rgba(239,68,68,0.5), 0 0 0 9999px rgba(0,0,0,0.7); }
+    /* Vòng tròn hướng dẫn đã được làm cho responsive (co giãn theo màn hình) */
+    #guide-reticle { width: 70vw; max-width: 280px; aspect-ratio: 3/4; height: auto; border: 3px dashed rgba(255,255,255,0.6); border-radius: 50%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); transition: all 0.3s ease; }
+    #guide-reticle.active { border-color: #10b981; border-style: solid; box-shadow: 0 0 20px rgba(16,185,129,0.5), 0 0 0 9999px rgba(0,0,0,0.6); transform: scale(1.02); }
+    #guide-reticle.error { border-color: #ef4444; border-style: solid; box-shadow: 0 0 20px rgba(239,68,68,0.5), 0 0 0 9999px rgba(0,0,0,0.6); }
 
-    /* Thanh thông báo nổi */
     #status-bar { position: absolute; top: 5%; left: 50%; transform: translateX(-50%); width: 90%; max-width: 340px; background: rgba(31, 41, 55, 0.95); backdrop-filter: blur(8px); padding: 14px 16px; border-radius: 12px; text-align: center; font-weight: 600; font-size: 15px; z-index: 3; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s; }
     #status-bar.warning { background: #fffbeb; color: #b45309; border-color: #fde68a; }
     #status-bar.success { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
     #status-bar.error { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
 
-    /* Nút bấm ở dưới cùng */
     #action-area { position: absolute; bottom: 5%; left: 0; width: 100%; display: flex; justify-content: center; gap: 12px; z-index: 3; padding: 0 20px; }
     button { padding: 16px 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; font-size: 16px; width: 100%; max-width: 250px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; gap: 8px;}
     button:active { transform: scale(0.96); }
     
     #btnEnroll { background: #fff; color: #1d4ed8; }
-    #btnRetry { background: linear-gradient(135deg,#ef4444,#dc2626); color: #fff; }
+    #btnRetry { background: linear-gradient(135deg,#ef4444,#dc2626); color: #fff; display: none; }
     .hidden { display: none !important; }
   </style>
 </head>
@@ -108,8 +106,10 @@
       }
       
       setStatus('Đang mở Camera...', 'warning');
+      
+      // BỎ ÉP KÍCH THƯỚC ĐỂ TRÁNH TRÌNH DUYỆT ZOOM (CROP) CAMERA
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 1280 } },
+        video: { facingMode: 'user' }, 
         audio: false
       });
       video.srcObject = stream;
@@ -117,7 +117,6 @@
 
       setStatus('Vui lòng đưa mặt vào khung hình', '');
       
-      // Auto scan nếu là sinh viên
       if (userRole !== 'ADMIN') {
          startAutoScan();
       }
@@ -131,7 +130,7 @@
     isVerifying = false;
     goodFrames = 0;
     reticleEl.className = '';
-    btnRetry.classList.add('hidden'); // Đảm bảo ẩn nút Retry khi đang tự quét
+    btnRetry.classList.add('hidden'); 
 
     if(guidanceInterval) clearInterval(guidanceInterval);
     
@@ -151,20 +150,22 @@
         const faceW = det.detection.box.width;
         const ratio = faceW / videoW;
 
-        if (ratio < 0.25) {
+        if (ratio < 0.20) {
             setStatus('👋 Hãy đưa camera LẠI GẦN hơn', 'warning');
             reticleEl.className = '';
             goodFrames = 0;
             return;
         } 
-        if (ratio > 0.70) {
+        
+        // NỚI LỎNG TỶ LỆ: KHUÔN MẶT CHIẾM 85% MÀN HÌNH VẪN QUÉT ĐƯỢC
+        if (ratio > 0.85) {
             setStatus('🤚 Hãy đưa camera RA XA một chút', 'warning');
             reticleEl.className = '';
             goodFrames = 0;
             return;
         }
 
-        if (det.detection.score < 0.6) {
+        if (det.detection.score < 0.5) {
             setStatus('💡 Ánh sáng tối hoặc mặt bị che.', 'warning');
             reticleEl.className = '';
             goodFrames = 0;
@@ -191,7 +192,7 @@
       if (!faceData) {
           setStatus('❌ Bạn chưa được đăng ký khuôn mặt!', 'error');
           reticleEl.className = 'error';
-          btnRetry.classList.remove('hidden'); // HIỆN NÚT XÁC THỰC LẠI
+          btnRetry.classList.remove('hidden');
           return;
       }
 
@@ -201,22 +202,20 @@
           setStatus('✅ Nhận diện thành công!', 'success');
           reticleEl.className = 'active';
           sendToParent('VERIFIED', { maNV, distance });
-          // Tắt camera
           const stream = video.srcObject;
           if (stream) stream.getTracks().forEach(track => track.stop());
       } else {
           setStatus('❌ Khuôn mặt không khớp! Bấm "Xác Thực Lại"', 'error');
           reticleEl.className = 'error';
-          btnRetry.classList.remove('hidden'); // HIỆN NÚT XÁC THỰC LẠI
+          btnRetry.classList.remove('hidden');
           sendToParent('FAILED', { maNV, distance });
       }
   }
 
-  // SỰ KIỆN NÚT XÁC THỰC LẠI
   btnRetry.onclick = () => {
-      btnRetry.classList.add('hidden'); // Ẩn nút đi
+      btnRetry.classList.add('hidden'); 
       setStatus('Vui lòng đưa mặt vào khung hình', '');
-      startAutoScan(); // Chạy lại quá trình tự động
+      startAutoScan(); 
   };
 
   btnEnroll.onclick = async () => {
