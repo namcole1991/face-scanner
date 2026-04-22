@@ -2451,13 +2451,14 @@ const GPSSettings = () => {
         );
     };
 
-    const handleSave = () => {
+const handleSave = () => {
         if (!form.latitude || !form.longitude) {
             setToast({ open: true, msg: 'Vui lòng nhập tọa độ', severity: 'error' });
             return;
         }
+        // Đã xóa điều kiện chặn (form.time_start >= form.time_end) để cho phép ca qua đêm
         if (!form.time_start || !form.time_end) {
-            setToast({ open: true, msg: 'Thời gian cấu hình không hợp lệ', severity: 'error' });
+            setToast({ open: true, msg: 'Vui lòng chọn đầy đủ thời gian', severity: 'error' });
             return;
         }
         
@@ -2723,6 +2724,18 @@ const GPSCheckIn = () => {
         }
     }, [currentTime, officeLocation]);
 
+    // TẠO CÂU THÔNG BÁO THÔNG MINH (Hôm nay / Hôm sau)
+    const timeWarningMsg = useMemo(() => {
+        if (!officeLocation) return '';
+        const start = officeLocation.time_start;
+        const end = officeLocation.time_end;
+        if (start <= end) {
+            return `Hệ thống chỉ cho phép điểm danh từ ${start} hôm nay đến ${end} hôm nay. Vui lòng quay lại sau!`;
+        } else {
+            return `Hệ thống chỉ cho phép điểm danh từ ${start} hôm nay đến ${end} hôm sau. Vui lòng quay lại sau!`;
+        }
+    }, [officeLocation]);
+
     const isInRange = distance !== null && officeLocation && distance <= officeLocation.radius;
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -2803,7 +2816,7 @@ const GPSCheckIn = () => {
 {/* HIỂN THỊ CẢNH BÁO THỜI GIAN */}
             {hasFaceData && officeLocation && !isTimeValid && (
                 <Alert severity="error" sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}>
-                    Hệ thống chỉ cho phép điểm danh từ {officeLocation.time_start} hôm nay đến {officeLocation.time_end} hôm nay. Vui lòng quay lại sau!
+                    {timeWarningMsg}
                 </Alert>
             )}
 
