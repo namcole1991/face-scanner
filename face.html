@@ -3,20 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Face Scanner Auto</title>
+  <title>Face Scanner Auto Guided</title>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
     
     #video-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-    /* Tăng độ sáng và độ tương phản của Camera lên 15% để AI nhìn rõ hơn */
     video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); filter: brightness(1.15) contrast(1.05); }
     
-    /* ĐÃ XÓA LỚP NỀN ĐEN PHỦ LÊN MÀN HÌNH Ở ĐÂY */
     #guide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; }
     
-    /* Vòng tròn giữ nguyên độ tối mờ ở XUNG QUANH (box-shadow), nhưng TRONG SUỐT HOÀN TOÀN ở giữa */
     #guide-reticle { width: 70vw; max-width: 280px; aspect-ratio: 3/4; height: auto; border: 3px dashed rgba(255,255,255,0.8); border-radius: 50%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.65); transition: all 0.3s ease; }
     #guide-reticle.active { border-color: #10b981; border-style: solid; box-shadow: 0 0 20px rgba(16,185,129,0.5), 0 0 0 9999px rgba(0,0,0,0.65); transform: scale(1.02); }
     #guide-reticle.error { border-color: #ef4444; border-style: solid; box-shadow: 0 0 20px rgba(239,68,68,0.5), 0 0 0 9999px rgba(0,0,0,0.65); }
@@ -30,7 +27,6 @@
     button { padding: 16px 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; font-size: 16px; width: 100%; max-width: 250px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; gap: 8px;}
     button:active { transform: scale(0.96); }
     
-    #btnEnroll { background: #fff; color: #1d4ed8; }
     #btnRetry { background: linear-gradient(135deg,#ef4444,#dc2626); color: #fff; display: none; }
     .hidden { display: none !important; }
   </style>
@@ -48,8 +44,7 @@
 </div>
 
 <div id="action-area">
-  <button id="btnEnroll" type="button" class="hidden">Đăng Ký Khuôn Mặt</button>
-  <button id="btnRetry" type="button" class="hidden">🔄 Xác Thực Lại</button>
+  <button id="btnRetry" type="button" class="hidden">🔄 Thử Lại</button>
 </div>
 
 <script>
@@ -58,7 +53,6 @@
   const video = document.getElementById('video');
   const statusEl = document.getElementById('status-bar');
   const reticleEl = document.getElementById('guide-reticle');
-  const btnEnroll = document.getElementById('btnEnroll');
   const btnRetry = document.getElementById('btnRetry');
 
   let maNV = '';
@@ -67,7 +61,7 @@
   
   let modelsLoaded = false;
   let guidanceInterval = null; 
-  let isVerifying = false; 
+  let isProcessing = false; // Biến khóa trạng thái chung (cho cả Enroll và Verify)
   let goodFrames = 0; 
 
   window.addEventListener('message', (e) => {
@@ -75,9 +69,17 @@
         maNV = e.data.maNV || '';
         userRole = e.data.role || '';
         faceData = e.data.faceData ? new Float32Array(JSON.parse(e.data.faceData)) : null;
+    }
 
-        if (userRole === 'ADMIN') {
-            btnEnroll.classList.remove('hidden');
+    // Lắng nghe kết quả ĐĂNG KÝ MẶT TỪ BACKEND TRẢ VỀ
+    if (e.data && e.data.type === 'ENROLL_RESULT') {
+        if (e.data.success) {
+            setStatus('✅ Đã lưu khuôn mặt vào hệ thống!', 'success');
+            stopCamera();
+        } else {
+            setStatus('❌ Lỗi lưu: ' + e.data.message, 'error');
+            reticleEl.className = 'error';
+            btnRetry.classList.remove('hidden'); // Cho phép thử lại
         }
     }
   });
@@ -94,6 +96,14 @@
     statusEl.textContent = msg;
     statusEl.className = type; 
   }
+  
+  function stopCamera() {
+      const stream = video.srcObject;
+      if (stream) stream.getTracks().forEach(track => track.stop());
+  }
+
+  // Hàm tính khoảng cách giữa 2 điểm (dùng để đo góc nghiêng khuôn mặt)
+  const getDistance = (p1, p2) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 
   async function init() {
     setStatus('Đang tải AI...', 'warning');
@@ -108,7 +118,6 @@
       }
       
       setStatus('Đang mở Camera...', 'warning');
-      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' }, 
         audio: false
@@ -118,9 +127,8 @@
 
       setStatus('Vui lòng đưa mặt vào khung hình', '');
       
-      if (userRole !== 'ADMIN') {
-         startAutoScan();
-      }
+      // Khởi động luồng tự động quét cho TẤT CẢ mọi người (Admin & SV)
+      startAutoScan();
 
     } catch (err) {
       setStatus('Lỗi: Trình duyệt chặn Camera!', 'error');
@@ -128,7 +136,7 @@
   }
 
   function startAutoScan() {
-    isVerifying = false;
+    isProcessing = false;
     goodFrames = 0;
     reticleEl.className = '';
     btnRetry.classList.add('hidden'); 
@@ -136,7 +144,7 @@
     if(guidanceInterval) clearInterval(guidanceInterval);
     
     guidanceInterval = setInterval(async () => {
-        if (isVerifying) return;
+        if (isProcessing) return;
 
         const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
 
@@ -147,6 +155,7 @@
             return;
         }
 
+        // 1. Phân tích Khoảng Cách
         const videoW = video.videoWidth || 320;
         const faceW = det.detection.box.width;
         const ratio = faceW / videoW;
@@ -157,7 +166,6 @@
             goodFrames = 0;
             return;
         } 
-        
         if (ratio > 0.85) {
             setStatus('🤚 Hãy đưa camera RA XA một chút', 'warning');
             reticleEl.className = '';
@@ -165,13 +173,32 @@
             return;
         }
 
-        if (det.detection.score < 0.5) {
+        // 2. Phân tích Ánh Sáng / Bị che
+        if (det.detection.score < 0.6) {
             setStatus('💡 Ánh sáng tối hoặc mặt bị che.', 'warning');
             reticleEl.className = '';
             goodFrames = 0;
             return;
         }
 
+        // 3. Phân tích Độ Nghiêng (Khuôn mặt có đang nhìn thẳng không?)
+        const landmarks = det.landmarks;
+        const nose = landmarks.getNose();
+        const jawline = landmarks.getJawOutline();
+        // Tính bề ngang của viền hàm và vị trí của mũi so với 2 mép hàm
+        const jawWidth = getDistance(jawline[0], jawline[16]);
+        const noseToJawLeft = getDistance(nose[0], jawline[0]);
+        const noseRatio = noseToJawLeft / jawWidth;
+
+        // Tỷ lệ chuẩn khi nhìn thẳng là khoảng 0.5 (Mũi nằm giữa). Cho phép sai số từ 0.35 đến 0.65
+        if (noseRatio < 0.35 || noseRatio > 0.65) {
+            setStatus('👤 Vui lòng nhìn THẲNG vào camera', 'warning');
+            reticleEl.className = '';
+            goodFrames = 0;
+            return;
+        }
+
+        // --- NẾU ĐẠT TẤT CẢ CHUẨN ---
         goodFrames++;
         reticleEl.className = 'active';
         
@@ -180,14 +207,32 @@
 
         if (goodFrames >= 3) {
             clearInterval(guidanceInterval);
-            executeVerification(det.descriptor);
+            isProcessing = true;
+            
+            // PHÂN NHÁNH XỬ LÝ TỰ ĐỘNG DỰA VÀO QUYỀN
+            if (userRole === 'ADMIN') {
+                executeAutoEnroll(det.descriptor);
+            } else {
+                executeAutoVerify(det.descriptor);
+            }
         }
     }, 300); 
   }
 
-  async function executeVerification(currentDescriptor) {
-      isVerifying = true;
-      setStatus('⏳ Đang kiểm tra dữ liệu...', 'warning');
+  // --- TỰ ĐỘNG ĐĂNG KÝ (DÀNH CHO ADMIN) ---
+  async function executeAutoEnroll(descriptor) {
+      setStatus('⏳ Đang tạo mã sinh trắc...', 'warning');
+      const descriptorStr = JSON.stringify(Array.from(descriptor));
+      
+      // Gửi dữ liệu về cho React để lưu
+      sendToParent('ENROLL', { maNV, descriptor: descriptorStr });
+      setStatus('Đang tải dữ liệu lên máy chủ...');
+      // Chờ phản hồi ENROLL_RESULT để thông báo thành công
+  }
+
+  // --- TỰ ĐỘNG XÁC THỰC (DÀNH CHO SINH VIÊN) ---
+  async function executeAutoVerify(currentDescriptor) {
+      setStatus('⏳ Đang đối chiếu dữ liệu...', 'warning');
 
       if (!faceData) {
           setStatus('❌ Bạn chưa được đăng ký khuôn mặt!', 'error');
@@ -202,37 +247,23 @@
           setStatus('✅ Nhận diện thành công!', 'success');
           reticleEl.className = 'active';
           sendToParent('VERIFIED', { maNV, distance });
-          const stream = video.srcObject;
-          if (stream) stream.getTracks().forEach(track => track.stop());
+          stopCamera();
       } else {
-          setStatus('❌ Khuôn mặt không khớp! Bấm "Xác Thực Lại"', 'error');
+          setStatus('❌ Khuôn mặt không khớp! Bấm "Thử Lại"', 'error');
           reticleEl.className = 'error';
           btnRetry.classList.remove('hidden');
           sendToParent('FAILED', { maNV, distance });
       }
   }
 
+  // NÚT THỬ LẠI (Dùng chung cho cả lỗi đăng ký và lỗi xác thực)
   btnRetry.onclick = () => {
       btnRetry.classList.add('hidden'); 
       setStatus('Vui lòng đưa mặt vào khung hình', '');
       startAutoScan(); 
   };
 
-  btnEnroll.onclick = async () => {
-    btnEnroll.disabled = true;
-    setStatus('Đang chụp ảnh...', 'warning');
-    const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-
-    if (det) {
-      const descriptorStr = JSON.stringify(Array.from(det.descriptor));
-      sendToParent('ENROLL', { maNV, descriptor: descriptorStr });
-      setStatus('✅ Đã lưu khuôn mặt!', 'success');
-    } else {
-      setStatus('⚠️ Không tìm thấy khuôn mặt rõ nét.', 'error');
-    }
-    setTimeout(() => btnEnroll.disabled = false, 2000);
-  };
-
+  // Khởi chạy khi thư viện đã sẵn sàng
   let checkLoad = setInterval(() => {
      if (typeof faceapi !== 'undefined') {
          clearInterval(checkLoad);
