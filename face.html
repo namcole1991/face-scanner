@@ -36,8 +36,9 @@
 </div>
 
 <script>
-  // Trỏ về thư mục weights bạn đã upload lên Github
-  const MODEL_URL = './weights';
+  // Dùng trực tiếp máy chủ gốc của tác giả để đảm bảo 100% không thiếu file
+  const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+  
   const video = document.getElementById('video');
   const statusEl = document.getElementById('status');
   const btnEnroll = document.getElementById('btnEnroll');
@@ -84,17 +85,17 @@
   let modelsLoaded = false;
 
   async function init() {
-    setStatus('Đang tải AI models...');
+    setStatus('Đang tải cấu hình AI...');
     btnNormal.style.display = 'flex';
     btnError.style.display = 'none';
 
     try {
       if (!modelsLoaded) {
+        // ĐÃ BỎ LOAD CẢM XÚC ĐỂ APP NHẸ VÀ KHÔNG BỊ LỖI 404
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
         ]);
         modelsLoaded = true;
       }
@@ -144,11 +145,12 @@
       return;
     }
     setStatus('Đang xác thực...');
+    
+    // Đã bỏ .withFaceExpressions() ở đây
     const det = await faceapi
       .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
-      .withFaceDescriptor()
-      .withFaceExpressions();
+      .withFaceDescriptor();
 
     if (det) {
       const distance = faceapi.euclideanDistance(det.descriptor, faceData);
