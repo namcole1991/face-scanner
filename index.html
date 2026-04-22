@@ -2404,236 +2404,242 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
             );
         };
 
-// --- GPS SETTINGS COMPONENT (ADMIN) ---
-        const GPSSettings = () => {
-            const [form, setForm] = useState({ latitude: '', longitude: '', radius: 200, address: '' });
-            const [loading, setLoading] = useState(true);
-            const [saving, setSaving] = useState(false);
-            const [toast, setToast] = useState({ open: false, msg: '', severity: 'success' });
-            const [detecting, setDetecting] = useState(false);
+const GPSSettings = () => {
+    const [form, setForm] = useState({ latitude: '', longitude: '', radius: 200, address: '', time_start: '07:00', time_end: '18:00' });
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [toast, setToast] = useState({ open: false, msg: '', severity: 'success' });
+    const [detecting, setDetecting] = useState(false);
 
-            useEffect(() => {
-                callServer('getOfficeLocation').then(res => {
-                    if (res) {
-                        setForm({
-                            latitude: res.latitude || '',
-                            longitude: res.longitude || '',
-                            radius: res.radius || 200,
-                            address: res.address || ''
-                        });
-                    }
-                    setLoading(false);
-                }).catch(() => setLoading(false));
-            }, []);
-
-            const handleDetectLocation = () => {
-                if (!navigator.geolocation) {
-                    setToast({ open: true, msg: 'Trình duyệt không hỗ trợ GPS', severity: 'error' });
-                    return;
-                }
-                setDetecting(true);
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        setForm(prev => ({
-                            ...prev,
-                            latitude: pos.coords.latitude.toFixed(6),
-                            longitude: pos.coords.longitude.toFixed(6)
-                        }));
-                        setDetecting(false);
-                        setToast({ open: true, msg: 'Đã lấy tọa độ hiện tại!', severity: 'success' });
-                    },
-                    (err) => {
-                        setDetecting(false);
-                        setToast({ open: true, msg: 'Không thể lấy vị trí: ' + err.message, severity: 'error' });
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }
-                );
-            };
-
-            const handleSave = () => {
-                if (!form.latitude || !form.longitude) {
-                    setToast({ open: true, msg: 'Vui lòng nhập tọa độ', severity: 'error' });
-                    return;
-                }
-                setSaving(true);
-                callServer('saveOfficeLocation', {
-                    latitude: parseFloat(form.latitude),
-                    longitude: parseFloat(form.longitude),
-                    radius: parseInt(form.radius),
-                    address: form.address
-                }).then(res => {
-                    setSaving(false);
-                    if (res && res.success) {
-                        setToast({ open: true, msg: 'Đã lưu cài đặt GPS!', severity: 'success' });
-                    } else {
-                        setToast({ open: true, msg: 'Lỗi khi lưu!', severity: 'error' });
-                    }
-                }).catch(() => {
-                    setSaving(false);
-                    setToast({ open: true, msg: 'Lỗi kết nối!', severity: 'error' });
+    useEffect(() => {
+        callServer('getOfficeLocation').then(res => {
+            if (res) {
+                setForm({
+                    latitude: res.latitude || '',
+                    longitude: res.longitude || '',
+                    radius: res.radius || 200,
+                    address: res.address || '',
+                    time_start: res.time_start || '07:00',
+                    time_end: res.time_end || '18:00'
                 });
-            };
+            }
+            setLoading(false);
+        }).catch(() => setLoading(false));
+    }, []);
 
-            // ĐÃ SỬA LẠI ĐƯỜNG LINK GOOGLE MAPS CHUẨN
-            const mapUrl = form.latitude && form.longitude
-                ? `https://maps.google.com/maps?q=${form.latitude},${form.longitude}&hl=vi&z=16&output=embed`
-                : null;
+    const handleDetectLocation = () => {
+        if (!navigator.geolocation) {
+            setToast({ open: true, msg: 'Trình duyệt không hỗ trợ GPS', severity: 'error' });
+            return;
+        }
+        setDetecting(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setForm(prev => ({
+                    ...prev,
+                    latitude: pos.coords.latitude.toFixed(6),
+                    longitude: pos.coords.longitude.toFixed(6)
+                }));
+                setDetecting(false);
+                setToast({ open: true, msg: 'Đã lấy tọa độ hiện tại!', severity: 'success' });
+            },
+            (err) => {
+                setDetecting(false);
+                setToast({ open: true, msg: 'Không thể lấy vị trí: ' + err.message, severity: 'error' });
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    };
 
-            if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}><CircularProgress /></Box>;
+    const handleSave = () => {
+        if (!form.latitude || !form.longitude) {
+            setToast({ open: true, msg: 'Vui lòng nhập tọa độ', severity: 'error' });
+            return;
+        }
+        if (!form.time_start || !form.time_end || form.time_start >= form.time_end) {
+            setToast({ open: true, msg: 'Thời gian cấu hình không hợp lệ', severity: 'error' });
+            return;
+        }
+        
+        setSaving(true);
+        callServer('saveOfficeLocation', {
+            latitude: parseFloat(form.latitude),
+            longitude: parseFloat(form.longitude),
+            radius: parseInt(form.radius),
+            address: form.address,
+            time_start: form.time_start,
+            time_end: form.time_end
+        }).then(res => {
+            setSaving(false);
+            if (res && res.success) {
+                setToast({ open: true, msg: 'Đã lưu cài đặt GPS & Thời gian!', severity: 'success' });
+            } else {
+                setToast({ open: true, msg: 'Lỗi khi lưu!', severity: 'error' });
+            }
+        }).catch(() => {
+            setSaving(false);
+            setToast({ open: true, msg: 'Lỗi kết nối!', severity: 'error' });
+        });
+    };
 
-            return (
-                <Box>
-                    <Box sx={{ mb: { xs: 2, md: 4 } }}>
-                        <Typography variant="h5" sx={{ color: '#111827', fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>Cài Đặt Chấm Công GPS</Typography>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>Thiết lập tọa độ văn phòng để nhân viên tự chấm công bằng GPS</Typography>
-                    </Box>
+    const mapUrl = form.latitude && form.longitude
+        ? `https://maps.google.com/maps?q=${form.latitude},${form.longitude}&hl=vi&z=16&output=embed`
+        : null;
 
-                    <Grid container spacing={{ xs: 2, md: 3 }}>
-                        {/* Settings Form */}
-                        <Grid item xs={12} md={5}>
-                            <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: 2 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                                    <Box sx={{ p: 1, borderRadius: 2, bgcolor: '#eff6ff', color: '#3b82f6' }}>
-                                        <span className="material-icons">settings_suggest</span>
-                                    </Box>
-                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>Tọa Độ Văn Phòng</Typography>
-                                </Box>
+    if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}><CircularProgress /></Box>;
 
-                                <Stack spacing={2.5}>
+    return (
+        <Box>
+            <Box sx={{ mb: { xs: 2, md: 4 } }}>
+                <Typography variant="h5" sx={{ color: '#111827', fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>Cài Đặt Chấm Công</Typography>
+                <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>Thiết lập tọa độ và khoảng thời gian cho phép điểm danh</Typography>
+            </Box>
+
+            <Grid container spacing={{ xs: 2, md: 3 }}>
+                <Grid item xs={12} md={5}>
+                    <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                            <Box sx={{ p: 1, borderRadius: 2, bgcolor: '#eff6ff', color: '#3b82f6' }}>
+                                <span className="material-icons">settings_suggest</span>
+                            </Box>
+                            <Typography variant="h6" sx={{ fontWeight: 600 }}>Cấu Hình Điểm Danh</Typography>
+                        </Box>
+
+                        <Stack spacing={2.5}>
+                            {/* Khung cấu hình thời gian */}
+                            <Box sx={{ p: 2, bgcolor: '#fffbeb', borderRadius: 2, border: '1px solid #fde68a' }}>
+                                <Typography variant="subtitle2" sx={{ mb: 1.5, color: '#92400e', fontWeight: 'bold' }}>⏰ Thời Gian Cho Phép</Typography>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={6}>
+                                        <TextField
+                                            label="Giờ bắt đầu"
+                                            type="time"
+                                            fullWidth
+                                            size="small"
+                                            value={form.time_start}
+                                            onChange={(e) => setForm({ ...form, time_start: e.target.value })}
+                                            InputLabelProps={{ shrink: true }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <TextField
+                                            label="Giờ kết thúc"
+                                            type="time"
+                                            fullWidth
+                                            size="small"
+                                            value={form.time_end}
+                                            onChange={(e) => setForm({ ...form, time_end: e.target.value })}
+                                            InputLabelProps={{ shrink: true }}
+                                        />
+                                    </Grid>
+                                </Grid>
+                            </Box>
+
+                            <TextField
+                                label="Địa chỉ văn phòng"
+                                fullWidth
+                                size="small"
+                                value={form.address}
+                                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                                placeholder="VD: 123 Nguyễn Huệ, Q1, TP.HCM"
+                                InputProps={{ startAdornment: <span className="material-icons" style={{ color: '#9ca3af', marginRight: 8, fontSize: 20 }}>location_on</span> }}
+                            />
+
+                            <Grid container spacing={2}>
+                                <Grid item xs={6}>
                                     <TextField
-                                        label="Địa chỉ văn phòng"
+                                        label="Vĩ độ (Latitude)"
                                         fullWidth
                                         size="small"
-                                        value={form.address}
-                                        onChange={(e) => setForm({ ...form, address: e.target.value })}
-                                        placeholder="VD: 123 Nguyễn Huệ, Q1, TP.HCM"
-                                        InputProps={{
-                                            startAdornment: <span className="material-icons" style={{ color: '#9ca3af', marginRight: 8, fontSize: 20 }}>location_on</span>
-                                        }}
+                                        type="number"
+                                        value={form.latitude}
+                                        onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+                                        inputProps={{ step: '0.000001' }}
                                     />
-
-                                    <Grid container spacing={2}>
-                                        <Grid item xs={6}>
-                                            <TextField
-                                                label="Vĩ độ (Latitude)"
-                                                fullWidth
-                                                size="small"
-                                                type="number"
-                                                value={form.latitude}
-                                                onChange={(e) => setForm({ ...form, latitude: e.target.value })}
-                                                inputProps={{ step: '0.000001' }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <TextField
-                                                label="Kinh độ (Longitude)"
-                                                fullWidth
-                                                size="small"
-                                                type="number"
-                                                value={form.longitude}
-                                                onChange={(e) => setForm({ ...form, longitude: e.target.value })}
-                                                inputProps={{ step: '0.000001' }}
-                                            />
-                                        </Grid>
-                                    </Grid>
-
-                                    <Button
-                                        variant="outlined"
-                                        color="secondary"
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="Kinh độ (Longitude)"
                                         fullWidth
-                                        startIcon={detecting ? <CircularProgress size={20} /> : <span className="material-icons">gps_fixed</span>}
-                                        onClick={handleDetectLocation}
-                                        disabled={detecting}
-                                    >
-                                        {detecting ? 'Đang xác định...' : 'Lấy tọa độ hiện tại'}
-                                    </Button>
+                                        size="small"
+                                        type="number"
+                                        value={form.longitude}
+                                        onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+                                        inputProps={{ step: '0.000001' }}
+                                    />
+                                </Grid>
+                            </Grid>
 
-                                    <Box>
-                                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <span className="material-icons" style={{ fontSize: 18, color: '#f59e0b' }}>radar</span>
-                                            Bán kính cho phép: <Chip label={`${form.radius}m`} size="small" color="primary" />
-                                        </Typography>
-                                        <Slider
-                                            value={form.radius}
-                                            onChange={(e, val) => setForm({ ...form, radius: val })}
-                                            min={50}
-                                            max={1000}
-                                            step={50}
-                                            marks={[
-                                                { value: 50, label: '50m' },
-                                                { value: 200, label: '200m' },
-                                                { value: 500, label: '500m' },
-                                                { value: 1000, label: '1km' }
-                                            ]}
-                                            valueLabelDisplay="auto"
-                                            valueLabelFormat={(v) => `${v}m`}
-                                        />
-                                    </Box>
+                            <Button
+                                variant="outlined"
+                                color="secondary"
+                                fullWidth
+                                startIcon={detecting ? <CircularProgress size={20} /> : <span className="material-icons">gps_fixed</span>}
+                                onClick={handleDetectLocation}
+                                disabled={detecting}
+                            >
+                                {detecting ? 'Đang xác định...' : 'Lấy tọa độ hiện tại'}
+                            </Button>
 
-                                    <Alert severity="info" variant="outlined" sx={{ borderRadius: 2 }}>
-                                        <Typography variant="caption">Nhân viên cần ở trong bán kính <b>{form.radius}m</b> từ văn phòng để chấm công.</Typography>
-                                    </Alert>
+                            <Box>
+                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <span className="material-icons" style={{ fontSize: 18, color: '#f59e0b' }}>radar</span>
+                                    Bán kính cho phép: <Chip label={`${form.radius}m`} size="small" color="primary" />
+                                </Typography>
+                                <Slider
+                                    value={form.radius}
+                                    onChange={(e, val) => setForm({ ...form, radius: val })}
+                                    min={50} max={1000} step={50}
+                                    marks={[ { value: 50, label: '50m' }, { value: 200, label: '200m' }, { value: 1000, label: '1km' } ]}
+                                    valueLabelDisplay="auto"
+                                    valueLabelFormat={(v) => `${v}m`}
+                                />
+                            </Box>
 
-                                    <Button
-                                        variant="contained"
-                                        color="success"
-                                        size="large"
-                                        fullWidth
-                                        startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <span className="material-icons">save</span>}
-                                        onClick={handleSave}
-                                        disabled={saving || !form.latitude || !form.longitude}
-                                        sx={{ py: 1.5, fontWeight: 700, fontSize: '1rem' }}
-                                    >
-                                        {saving ? 'Đang lưu...' : 'Lưu Cài Đặt'}
-                                    </Button>
-                                </Stack>
-                            </Paper>
-                        </Grid>
+                            <Button
+                                variant="contained"
+                                color="success"
+                                size="large"
+                                fullWidth
+                                startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <span className="material-icons">save</span>}
+                                onClick={handleSave}
+                                disabled={saving || !form.latitude || !form.longitude}
+                                sx={{ py: 1.5, fontWeight: 700, fontSize: '1rem' }}
+                            >
+                                {saving ? 'Đang lưu...' : 'Lưu Cài Đặt'}
+                            </Button>
+                        </Stack>
+                    </Paper>
+                </Grid>
 
-                        {/* Map Preview */}
-                        <Grid item xs={12} md={7}>
-                            <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: 2, height: '100%', minHeight: { xs: 280, md: 450 } }}>
-                                {mapUrl ? (
-                                    <Box sx={{ position: 'relative', height: '100%', minHeight: 400 }}>
-                                        {/* ĐÃ SỬA LẠI SRC CỦA IFRAME ĐỂ HIỂN THỊ BẢN ĐỒ */}
-                                        <iframe 
-                                            src={mapUrl} 
-                                            width="100%" 
-                                            height="100%" 
-                                            frameBorder="0"
-                                            style={{ border: 0, minHeight: '450px' }}
-                                            allowFullScreen=""
-                                            aria-hidden="false"
-                                            tabIndex="0"
-                                        ></iframe>
-                                        <Box sx={{
-                                            position: 'absolute', bottom: { xs: 8, md: 16 }, left: { xs: 8, md: 16 }, right: { xs: 8, md: 'auto' },
-                                            bgcolor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(4px)',
-                                            p: { xs: 1.5, md: 2 }, borderRadius: 2, boxShadow: 3
-                                        }}>
-                                            <Typography variant="caption" color="textSecondary" display="block">📍 Tọa độ văn phòng</Typography>
-                                            <Typography variant="body2" fontWeight="bold" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{form.latitude}, {form.longitude}</Typography>
-                                            {form.address && <Typography variant="caption" color="textSecondary" sx={{ wordBreak: 'break-word' }}>{form.address}</Typography>}
-                                        </Box>
-                                    </Box>
-                                ) : (
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', p: { xs: 3, md: 4 }, color: 'text.secondary' }}>
-                                        <span className="material-icons" style={{ fontSize: 64, color: '#d1d5db', marginBottom: 12 }}>map</span>
-                                        <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>Chưa có tọa độ</Typography>
-                                        <Typography variant="body2" sx={{ textAlign: 'center' }}>Nhập tọa độ hoặc bấm "Lấy tọa độ hiện tại" để xem bản đồ</Typography>
-                                    </Box>
-                                )}
-                            </Paper>
-                        </Grid>
-                    </Grid>
+                <Grid item xs={12} md={7}>
+                    <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: 2, height: '100%', minHeight: { xs: 280, md: 450 } }}>
+                        {mapUrl ? (
+                            <Box sx={{ position: 'relative', height: '100%', minHeight: 400 }}>
+                                <iframe src={mapUrl} width="100%" height="100%" frameBorder="0" style={{ border: 0, minHeight: '450px' }} allowFullScreen="" aria-hidden="false" tabIndex="0"></iframe>
+                                <Box sx={{ position: 'absolute', bottom: { xs: 8, md: 16 }, left: { xs: 8, md: 16 }, right: { xs: 8, md: 'auto' }, bgcolor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(4px)', p: { xs: 1.5, md: 2 }, borderRadius: 2, boxShadow: 3 }}>
+                                    <Typography variant="caption" color="textSecondary" display="block">📍 Tọa độ văn phòng</Typography>
+                                    <Typography variant="body2" fontWeight="bold" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{form.latitude}, {form.longitude}</Typography>
+                                    {form.address && <Typography variant="caption" color="textSecondary" sx={{ wordBreak: 'break-word' }}>{form.address}</Typography>}
+                                </Box>
+                            </Box>
+                        ) : (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', p: { xs: 3, md: 4 }, color: 'text.secondary' }}>
+                                <span className="material-icons" style={{ fontSize: 64, color: '#d1d5db', marginBottom: 12 }}>map</span>
+                                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>Chưa có tọa độ</Typography>
+                                <Typography variant="body2" sx={{ textAlign: 'center' }}>Nhập tọa độ hoặc bấm "Lấy tọa độ hiện tại" để xem bản đồ</Typography>
+                            </Box>
+                        )}
+                    </Paper>
+                </Grid>
+            </Grid>
 
-                    <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast({ ...toast, open: false })}>
-                        <Alert severity={toast.severity} variant="filled">{toast.msg}</Alert>
-                    </Snackbar>
-                </Box>
-            );
-        };
-
+            <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast({ ...toast, open: false })}>
+                <Alert severity={toast.severity} variant="filled">{toast.msg}</Alert>
+            </Snackbar>
+        </Box>
+    );
+};
 const GPSCheckIn = () => {
     const { user, employees } = React.useContext(DataContext); 
     const [gpsStatus, setGpsStatus] = useState('idle');
@@ -2702,6 +2708,13 @@ const GPSCheckIn = () => {
         if (officeLocation) detectLocation();
     }, [officeLocation, detectLocation]);
 
+    // KIỂM TRA ĐIỀU KIỆN THỜI GIAN
+    const isTimeValid = useMemo(() => {
+        if (!officeLocation || !officeLocation.time_start || !officeLocation.time_end) return false;
+        const currentStr = currentTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+        return currentStr >= officeLocation.time_start && currentStr <= officeLocation.time_end;
+    }, [currentTime, officeLocation]);
+
     const isInRange = distance !== null && officeLocation && distance <= officeLocation.radius;
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -2711,18 +2724,19 @@ const GPSCheckIn = () => {
     };
 
     const handleCheckInClick = () => {
+        if (!isTimeValid) {
+            setToast({ open: true, msg: `❌ Hiện tại đang ngoài giờ điểm danh (${officeLocation?.time_start} - ${officeLocation?.time_end})`, severity: 'error' });
+            return;
+        }
         setScannerMode('VERIFY');
         setShowFaceScanner(true);
     };
 
-    // Xử lý khi sinh viên CHỦ ĐỘNG ẤN HỦY/ĐÓNG CAMERA lúc chưa xác thực xong
     const handleCancelScanner = () => {
         setShowFaceScanner(false);
-        // Báo lỗi điểm danh chưa thành công
         setToast({ open: true, msg: '⚠️ ĐIỂM DANH CHƯA THÀNH CÔNG (Bạn đã hủy xác thực khuôn mặt)', severity: 'warning' });
     };
 
-    // Xử lý sau khi Camera báo XÁC THỰC MẶT THÀNH CÔNG
     const handleFaceSuccess = () => {
         setShowFaceScanner(false); 
 
@@ -2731,7 +2745,6 @@ const GPSCheckIn = () => {
             return; 
         }
 
-        // Bắt đầu check GPS sau khi mặt đúng
         if (!userLocation || gpsStatus !== 'success') {
             setToast({ open: true, msg: '❌ Chưa lấy được tọa độ GPS. ĐIỂM DANH CHƯA THÀNH CÔNG!', severity: 'error' });
             return;
@@ -2742,7 +2755,6 @@ const GPSCheckIn = () => {
             return;
         }
 
-        // Đẩy dữ liệu lên Server nếu Mặt + GPS đều đúng
         executeCheckInOnServer();
     };
 
@@ -2758,7 +2770,6 @@ const GPSCheckIn = () => {
                         if (r) setTodayRecord(r);
                     });
                 } else {
-                    // Xử lý lỗi do Server trả về (ví dụ GPS bị trượt vào phút chót)
                     setToast({ open: true, msg: `❌ ${res.message} - ĐIỂM DANH CHƯA THÀNH CÔNG!`, severity: 'error' });
                 }
             })
@@ -2778,6 +2789,13 @@ const GPSCheckIn = () => {
             {!hasFaceData && (
                 <Alert severity="warning" sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}>
                     Tài khoản của bạn chưa có dữ liệu sinh trắc học. Bắt buộc phải đăng ký khuôn mặt trước khi sử dụng chức năng chấm công!
+                </Alert>
+            )}
+
+            {/* HIỂN THỊ CẢNH BÁO THỜI GIAN */}
+            {hasFaceData && officeLocation && !isTimeValid && (
+                <Alert severity="error" sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}>
+                    Hệ thống chỉ cho phép điểm danh từ {officeLocation.time_start} đến {officeLocation.time_end}. Vui lòng quay lại sau!
                 </Alert>
             )}
 
@@ -2841,8 +2859,7 @@ const GPSCheckIn = () => {
                                             px: { xs: 4, md: 6 }, py: { xs: 1.5, md: 2 }, borderRadius: { xs: 3, md: 4 },
                                             fontWeight: 800, fontSize: { xs: '1rem', md: '1.2rem' },
                                             background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                            boxShadow: '0 10px 30px -5px rgba(245, 158, 11, 0.5)',
-                                            '&:hover': { background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' }
+                                            boxShadow: '0 10px 30px -5px rgba(245, 158, 11, 0.5)'
                                         }}
                                         startIcon={<span className="material-icons">face_retouching_natural</span>}
                                     >
@@ -2852,20 +2869,21 @@ const GPSCheckIn = () => {
                                     <Button
                                         variant="contained"
                                         size="large"
-                                        disabled={checkingIn}
+                                        disabled={checkingIn || !isTimeValid} // Khóa nút nếu ngoài giờ
                                         onClick={handleCheckInClick}
                                         fullWidth={isMobile}
                                         sx={{
                                             px: { xs: 4, md: 6 }, py: { xs: 1.5, md: 2 }, borderRadius: { xs: 3, md: 4 },
                                             fontWeight: 800, fontSize: { xs: '1rem', md: '1.2rem' },
-                                            background: gpsStatus === 'success' && isInRange
+                                            background: isTimeValid && gpsStatus === 'success' && isInRange
                                                 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                                                 : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-                                            boxShadow: gpsStatus === 'success' && isInRange ? '0 10px 30px -5px rgba(16, 185, 129, 0.5)' : 'none',
+                                            boxShadow: isTimeValid && gpsStatus === 'success' && isInRange ? '0 10px 30px -5px rgba(16, 185, 129, 0.5)' : 'none',
+                                            opacity: isTimeValid ? 1 : 0.6 // Làm mờ nút nếu ngoài giờ
                                         }}
                                         startIcon={checkingIn ? <CircularProgress size={22} color="inherit" /> : <span className="material-icons">{todayRecord && !todayRecord.gioRa ? 'logout' : 'fingerprint'}</span>}
                                     >
-                                        {checkingIn ? 'Đang xử lý...' : (todayRecord && !todayRecord.gioRa ? 'CHẤM CÔNG RA' : 'CHẤM CÔNG VÀO')}
+                                        {checkingIn ? 'Đang xử lý...' : !isTimeValid ? 'NGOÀI GIỜ' : (todayRecord && !todayRecord.gioRa ? 'CHẤM CÔNG RA' : 'CHẤM CÔNG VÀO')}
                                     </Button>
                                 )}
                             </Box>
@@ -2919,13 +2937,12 @@ const GPSCheckIn = () => {
                 </Grid>
             </Grid>
 
-            {/* Popup Camera */}
             <Dialog 
                 open={showFaceScanner} 
                 disableEscapeKeyDown={true}
                 onClose={(event, reason) => {
                     if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') {
-                        handleCancelScanner(); // Gọi hàm Hủy khi đóng
+                        handleCancelScanner(); 
                     }
                 }}
                 fullScreen={isMobile}
@@ -2940,7 +2957,6 @@ const GPSCheckIn = () => {
                 </DialogContent>
                 
                 <DialogActions sx={{ justifyContent: 'center', p: 2, bgcolor: '#111827' }}>
-                    {/* Bấm vào đây cũng gọi hàm Hủy */}
                     <Button onClick={handleCancelScanner} color="error" variant="contained" sx={{ borderRadius: 2, width: '100%', maxWidth: 300 }}>
                         Hủy / Đóng Camera
                     </Button>
