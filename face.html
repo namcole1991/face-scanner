@@ -9,8 +9,17 @@
     QUAN TRỌNG: Load human.js từ CDN unpkg thay vì jsdelivr
     unpkg ổn định hơn cho package này
   -->
-  <script src="https://unpkg.com/@vladmandic/human@3.3.4/dist/human.js"></script>
-
+  <!-- Dùng đúng file esm-nobundle compile sẵn, không phụ thuộc tfjs riêng -->
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/human/dist/human.js"></script>
+<script>
+  // Debug: xem human.js export ra gì
+  window.addEventListener('load', () => {
+    console.log('=== HUMAN.JS DEBUG ===');
+    console.log('window.Human:', typeof window.Human, window.Human);
+    console.log('window.human:', typeof window.human, window.human);
+    console.log('Human keys:', window.Human ? Object.keys(window.Human) : 'N/A');
+  });
+</script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
@@ -145,65 +154,81 @@
     progressWrap.style.display = 'none';
   }
 
-  // ---- Khởi tạo Human.js ----
-  async function initHuman() {
+async function initHuman() {
     try {
       setStatus('Đang tải AI...', 'warning');
       setProgress(5, 'Chuẩn bị...');
 
-      // ---- Cấu hình Human ----
+      // ---- FIX CHÍNH: Xử lý các cách export khác nhau của human.js ----
+      let HumanClass;
+      if (typeof Human !== 'undefined') {
+        // Trường hợp 1: export trực tiếp (các version cũ)
+        HumanClass = Human;
+      } else if (typeof human !== 'undefined') {
+        // Trường hợp 2: export thường là object thay vì class
+        HumanClass = human.Human || human.default || human;
+      } else if (typeof window.Human !== 'undefined') {
+        HumanClass = window.Human;
+      } else if (typeof window.human !== 'undefined') {
+        HumanClass = window.human?.Human || window.human?.default || window.human;
+      } else {
+        throw new Error('Không tìm thấy thư viện Human.js! Kiểm tra CDN.');
+      }
+
+      console.log('[Human] Detected export:', typeof HumanClass, HumanClass);
+
+      // Cấu hình
       const config = {
-        // Trỏ models về GitHub Pages của bạn
         modelBasePath: MODEL_BASE_URL,
-
-        // Tắt backend mặc định để tránh lỗi WebGL trên một số trình duyệt
-        // 'webgl' nhanh nhất, fallback 'cpu' nếu lỗi
         backend: 'webgl',
-
-        // Chỉ bật những gì cần dùng — tắt hết phần còn lại để nhẹ hơn
         face: {
           enabled: true,
-          detector:    { enabled: true,  rotation: true, return: true, minConfidence: 0.4 },
+          detector:    { enabled: true, rotation: true, return: true, minConfidence: 0.4 },
           mesh:        { enabled: true  },
-          description: { enabled: true  },  // Bắt buộc để lấy embedding
-          liveness:    { enabled: true  },  // Chống ảnh giả
+          description: { enabled: true  },
+          liveness:    { enabled: true  },
           emotion:     { enabled: false },
           iris:        { enabled: false },
           age:         { enabled: false },
           gender:      { enabled: false },
         },
-        body:    { enabled: false },
-        hand:    { enabled: false },
-        object:  { enabled: false },
-        gesture: { enabled: false },
+        body:         { enabled: false },
+        hand:         { enabled: false },
+        object:       { enabled: false },
+        gesture:      { enabled: false },
         segmentation: { enabled: false },
-
-        // Giảm kích thước input để xử lý nhanh hơn
-        filter: {
-          enabled: true,
-          equalization: true,  // Tự cân bằng sáng
-          width: 0,            // 0 = giữ nguyên kích thước video
-        },
-
-        // Ngưỡng và tốc độ
-        async: true,
-        warmup: 'none',        // Sẽ warmup thủ công bên dưới
+        filter: { enabled: true, equalization: true, width: 0 },
+        async:  true,
+        warmup: 'none',
       };
 
-      human = new Human(config);
+      // Thử new HumanClass() trước, nếu lỗi thì thử cách gọi khác
+      try {
+        human = new HumanClass(config);
+      } catch (constructErr) {
+        console.warn('[Human] new() failed, trying .default:', constructErr);
+        if (HumanClass.default) {
+          human = new HumanClass.default(config);
+        } else if (typeof HumanClass === 'object' && HumanClass.Human) {
+          human = new HumanClass.Human(config);
+        } else {
+          throw new Error('Không thể khởi tạo Human: ' + constructErr.message);
+        }
+      }
+
+      console.log('[Human] Instance created:', human);
 
       // Lắng nghe tiến trình tải model
-      human.events.addEventListener('load', (evt) => {
-        const pct = Math.round((evt.loaded / Math.max(evt.total, 1)) * 70) + 10;
-        setProgress(pct, `Tải model... ${evt.loaded}/${evt.total}`);
-      });
+      if (human.events?.addEventListener) {
+        human.events.addEventListener('load', (evt) => {
+          const pct = Math.round((evt.loaded / Math.max(evt.total, 1)) * 70) + 10;
+          setProgress(pct, `Tải model... ${evt.loaded}/${evt.total}`);
+        });
+      }
 
-      // Tải models
       setProgress(10, 'Đang tải models...');
       await human.load();
       setProgress(85, 'Khởi động engine...');
-
-      // Warmup — chạy 1 lần rỗng để JIT compile WebGL shaders
       await human.warmup();
       setProgress(100, 'Hoàn tất!');
       setTimeout(hideProgress, 500);
@@ -225,16 +250,14 @@
       console.error('initHuman error:', err);
       hideProgress();
 
-      // Phân loại lỗi để hiển thị rõ ràng
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         setStatus('❌ Camera bị chặn! Hãy cấp quyền và thử lại.', 'error');
       } else if (err.name === 'NotFoundError') {
         setStatus('❌ Không tìm thấy Camera.', 'error');
       } else if (String(err).includes('404') || String(err).includes('model')) {
-        setStatus('❌ Không tải được models! Kiểm tra thư mục /models trên GitHub.', 'error');
+        setStatus('❌ Không tải được models! Kiểm tra thư mục /models.', 'error');
       } else if (String(err).includes('webgl') || String(err).includes('WebGL')) {
-        // Fallback sang CPU nếu WebGL lỗi
-        setStatus('⚠️ WebGL không khả dụng, đang thử CPU...', 'warning');
+        setStatus('⚠️ WebGL lỗi, đang thử CPU...', 'warning');
         retryWithCPU();
         return;
       } else {
