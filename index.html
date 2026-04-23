@@ -3075,15 +3075,16 @@ const FaceCheckIn = ({ user, onVerified, mode = 'VERIFY' }) => {
                 </Typography>
             )}
             <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
-                <iframe
-                    ref={iframeRef}
-                    src={FACE_URL}
-                    onLoad={handleIframeLoad}
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-                    title="Face Scanner"
-                    allow="camera; microphone"
-                />
-            </Box>
+            <iframe
+                ref={iframeRef}
+                src={FACE_URL}
+                onLoad={handleIframeLoad}
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                title="Face Scanner"
+                // THÊM DẤU * ĐỂ CHO PHÉP TRUY CẬP CAMERA TỪ IFRAME KHÁC DOMAIN
+                allow="camera *; microphone *" 
+            />
+        </Box>
         </Box>
     );
 };
