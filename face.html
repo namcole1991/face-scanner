@@ -82,12 +82,13 @@
   function setStatus(msg, type = '') { statusEl.textContent = msg; statusEl.className = type; }
   function stopCamera() { const stream = video.srcObject; if (stream) stream.getTracks().forEach(track => track.stop()); }
 
-async function initHuman() {
+// Khởi tạo thư viện Human
+  async function initHuman() {
     setStatus('Đang tải AI (Liveness)...', 'warning');
     
     const config = {
-      // SỬA DÒNG NÀY: Trỏ trực tiếp vào thư mục models bạn vừa up lên GitHub
-      modelBasePath: 'models', 
+      // SỬA DÒNG NÀY: Dùng đường dẫn tuyệt đối trỏ thẳng vào GitHub Pages của bạn
+      modelBasePath: 'https://namcole1991-web.github.io/face-scanner/models', 
       filter: { enabled: true, equalization: true },
       face: {
         enabled: true,
@@ -122,13 +123,12 @@ async function initHuman() {
           startAutoScan();
       };
     } catch (err) {
-      // IN CHI TIẾT LỖI RA CONSOLE ĐỂ ADMIN DỄ BẮT BỆNH
       console.error("CHI TIẾT LỖI HUMAN AI:", err);
       
       if (err.name === 'NotAllowedError' || err.name === 'NotFoundError') {
           setStatus('Lỗi: Trình duyệt hoặc Iframe đang chặn Camera!', 'error');
       } else {
-          setStatus('Lỗi: Không thể tải dữ liệu AI (Models)!', 'error');
+          setStatus('Lỗi: Không thể tải dữ liệu AI !', 'error');
       }
     }
   }
