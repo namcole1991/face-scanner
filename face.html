@@ -322,7 +322,7 @@ function checkOcclusion(face) {
     console.log('[Occlusion] Eye Z:', eyeAvgZ.toFixed(3), 'Nose Z:', noseZ.toFixed(3), 'Diff:', zDiff.toFixed(3));
 
     // Ngưỡng: nếu vùng mắt cao hơn mũi > 0.03 → có kính
-    if (zDiff > 0.03) {
+    if (zDiff > 0.04) {
         result.glasses = true;
     }
 
@@ -349,7 +349,7 @@ function checkOcclusion(face) {
     console.log('[Occlusion] Mouth+Chin Z:', mouthChinAvgZ.toFixed(3), 'Cheek Z:', cheekZ.toFixed(3), 'Diff:', maskZDiff.toFixed(3));
 
     // Nếu vùng miệng/cằm cao hơn má → có khẩu trang che
-    if (maskZDiff > 0.025) {
+    if (maskZDiff > 0.035) {
         result.mask = true;
     }
 
