@@ -435,14 +435,14 @@ function startScan() {
         // Chỉ áp dụng khi VERIFY (xác thực điểm danh)
         // ENROLL cho phép đăng ký không cần kiểm tra
         // =============================================
-        if (workMode === 'VERIFY') {
-            const occlusion = checkOcclusion(face);
-            if (occlusion.glasses || occlusion.mask) {
-                setStatus(occlusion.message, 'error');
-                reticle.className = 'error';
-                goodFrames = 0;
-                return;
-            }
+        // MỚI — áp dụng cho cả ENROLL và VERIFY
+const occlusion = checkOcclusion(face);
+if (occlusion.glasses || occlusion.mask) {
+    setStatus(occlusion.message, 'error');
+    reticle.className = 'error';
+    goodFrames = 0;
+    return;
+}
         }
 
         // Kiểm tra liveness
