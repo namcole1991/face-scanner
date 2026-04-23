@@ -286,8 +286,98 @@ async function initHuman() {
     }
   }
 
-  // ---- Vòng quét chính ----
-  function startScan() {
+// ---- Hàm kiểm tra che khuất khuôn mặt ----
+function checkOcclusion(face) {
+    const result = { glasses: false, mask: false, message: '' };
+
+    if (!face.mesh || face.mesh.length < 468) return result;
+
+    const mesh = face.mesh; // 468 điểm [x, y, z]
+
+    // ============================================
+    // KIỂM TRA KÍNH MẮT
+    // Dùng vùng quanh mắt: so sánh độ sâu (z)
+    // của điểm trên sống mũi vs điểm quanh mắt
+    // Nếu có kính, các điểm vùng mắt bị đẩy ra ngoài (z cao hơn)
+    // ============================================
+
+    // Điểm landmark vùng mắt trái (theo MediaPipe 468)
+    const leftEyeIndices  = [33, 7, 163, 144, 145, 153, 154, 155, 133];
+    const rightEyeIndices = [362, 382, 381, 380, 374, 373, 390, 249, 263];
+    // Điểm sống mũi (ít bị ảnh hưởng bởi kính)
+    const noseIndices = [1, 2, 5, 4, 19, 94];
+
+    const avgZ = (indices) => {
+        const sum = indices.reduce((acc, i) => acc + (mesh[i]?.[2] || 0), 0);
+        return sum / indices.length;
+    };
+
+    const leftEyeZ  = avgZ(leftEyeIndices);
+    const rightEyeZ = avgZ(rightEyeIndices);
+    const noseZ     = avgZ(noseIndices);
+    const eyeAvgZ   = (leftEyeZ + rightEyeZ) / 2;
+
+    // Kính làm tăng độ sâu vùng mắt so với mũi
+    const zDiff = eyeAvgZ - noseZ;
+    console.log('[Occlusion] Eye Z:', eyeAvgZ.toFixed(3), 'Nose Z:', noseZ.toFixed(3), 'Diff:', zDiff.toFixed(3));
+
+    // Ngưỡng: nếu vùng mắt cao hơn mũi > 0.03 → có kính
+    if (zDiff > 0.03) {
+        result.glasses = true;
+    }
+
+    // ============================================
+    // KIỂM TRA KHẨU TRANG
+    // Vùng miệng + cằm bị che → các điểm mesh
+    // vùng đó có độ lệch bất thường so với mũi
+    // ============================================
+
+    // Điểm vùng miệng (landmark 61→91 vùng môi ngoài)
+    const mouthOuterIndices = [61, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185];
+    // Điểm vùng cằm
+    const chinIndices = [152, 148, 176, 149, 150, 136, 172, 58, 132];
+    // Điểm vùng má giữa (ít bị che bởi khẩu trang)
+    const cheekIndices = [234, 454, 323, 361, 288, 397, 365, 379, 378, 400];
+
+    const mouthZ  = avgZ(mouthOuterIndices);
+    const chinZ   = avgZ(chinIndices);
+    const cheekZ  = avgZ(cheekIndices);
+
+    const mouthChinAvgZ = (mouthZ + chinZ) / 2;
+    const maskZDiff     = mouthChinAvgZ - cheekZ;
+
+    console.log('[Occlusion] Mouth+Chin Z:', mouthChinAvgZ.toFixed(3), 'Cheek Z:', cheekZ.toFixed(3), 'Diff:', maskZDiff.toFixed(3));
+
+    // Nếu vùng miệng/cằm cao hơn má → có khẩu trang che
+    if (maskZDiff > 0.025) {
+        result.mask = true;
+    }
+
+    // ============================================
+    // PHƯƠNG PHÁP 2: Kiểm tra faceScore vùng
+    // Nếu description score thấp bất thường → mặt bị che
+    // (Dùng kết hợp để tăng độ chính xác)
+    // ============================================
+    const descScore = face.faceScore || face.score || 1;
+    if (descScore < 0.55) {
+        // Score thấp thường do mặt bị che một phần lớn
+        result.mask = true;
+    }
+
+    // Tổng hợp message
+    if (result.glasses && result.mask) {
+        result.message = '🕶️😷 Vui lòng THÁO KÍNH và THÁO KHẨU TRANG!';
+    } else if (result.glasses) {
+        result.message = '🕶️ Vui lòng THÁO KÍNH ra!';
+    } else if (result.mask) {
+        result.message = '😷 Vui lòng THÁO KHẨU TRANG ra!';
+    }
+
+    return result;
+}
+
+// ---- Vòng quét chính (đã tích hợp kiểm tra occlusion) ----
+function startScan() {
     if (scanInterval) clearInterval(scanInterval);
     isProcessing = false;
     goodFrames   = 0;
@@ -295,85 +385,100 @@ async function initHuman() {
     hideRetry();
 
     scanInterval = setInterval(async () => {
-      if (isProcessing || !human) return;
+        if (isProcessing || !human) return;
 
-      const result = await human.detect(video);
-      const faces  = result?.face || [];
+        const result = await human.detect(video);
+        const faces  = result?.face || [];
 
-      // Không tìm thấy mặt
-      if (faces.length === 0) {
-        setStatus('👀 Không tìm thấy khuôn mặt', 'warning');
-        reticle.className = '';
-        goodFrames = 0;
-        return;
-      }
+        // Không thấy mặt
+        if (faces.length === 0) {
+            setStatus('👀 Không tìm thấy khuôn mặt', 'warning');
+            reticle.className = '';
+            goodFrames = 0;
+            return;
+        }
 
-      // Nhiều mặt
-      if (faces.length > 1) {
-        setStatus('👥 Phát hiện nhiều người! Hãy đứng 1 mình.', 'warning');
-        reticle.className = '';
-        goodFrames = 0;
-        return;
-      }
+        // Nhiều mặt
+        if (faces.length > 1) {
+            setStatus('👥 Nhiều người! Hãy đứng 1 mình.', 'warning');
+            reticle.className = '';
+            goodFrames = 0;
+            return;
+        }
 
-      const face = faces[0];
+        const face = faces[0];
 
-      // Kiểm tra khoảng cách (kích thước mặt so với khung hình)
-      const videoW = video.videoWidth || 640;
-      const faceW  = face.box?.[2] || 0;
-      const ratio  = faceW / videoW;
+        // Kiểm tra khoảng cách
+        const videoW = video.videoWidth || 640;
+        const faceW  = face.box?.[2] || 0;
+        const ratio  = faceW / videoW;
 
-      if (ratio < 0.18) {
-        setStatus('👋 Đưa mặt lại GẦN hơn', 'warning');
-        reticle.className = ''; goodFrames = 0; return;
-      }
-      if (ratio > 0.70) {
-        setStatus('🤚 Đưa mặt ra XA hơn', 'warning');
-        reticle.className = ''; goodFrames = 0; return;
-      }
+        if (ratio < 0.18) {
+            setStatus('👋 Đưa mặt lại GẦN hơn', 'warning');
+            reticle.className = ''; goodFrames = 0; return;
+        }
+        if (ratio > 0.70) {
+            setStatus('🤚 Đưa mặt ra XA hơn', 'warning');
+            reticle.className = ''; goodFrames = 0; return;
+        }
 
-      // Kiểm tra góc nghiêng đầu
-      const yaw   = face.rotation?.angle?.yaw   || 0;
-      const pitch = face.rotation?.angle?.pitch || 0;
-      if (Math.abs(yaw) > 0.28 || Math.abs(pitch) > 0.28) {
-        setStatus('👤 Nhìn THẲNG vào camera', 'warning');
-        reticle.className = ''; goodFrames = 0; return;
-      }
+        // Kiểm tra góc nghiêng
+        const yaw   = face.rotation?.angle?.yaw   || 0;
+        const pitch = face.rotation?.angle?.pitch || 0;
+        if (Math.abs(yaw) > 0.28 || Math.abs(pitch) > 0.28) {
+            setStatus('👤 Nhìn THẲNG vào camera', 'warning');
+            reticle.className = ''; goodFrames = 0; return;
+        }
 
-      // Kiểm tra chống giả mạo (liveness)
-      const liveness = face.liveness ?? 1; // Nếu model liveness chưa load, mặc định pass
-      if (liveness < 0.35) {
-        setStatus('🚫 Phát hiện ảnh giả mạo!', 'error');
-        reticle.className = 'error'; goodFrames = 0; return;
-      }
+        // =============================================
+        // KIỂM TRA KÍNH + KHẨU TRANG
+        // Chỉ áp dụng khi VERIFY (xác thực điểm danh)
+        // ENROLL cho phép đăng ký không cần kiểm tra
+        // =============================================
+        if (workMode === 'VERIFY') {
+            const occlusion = checkOcclusion(face);
+            if (occlusion.glasses || occlusion.mask) {
+                setStatus(occlusion.message, 'error');
+                reticle.className = 'error';
+                goodFrames = 0;
+                return;
+            }
+        }
 
-      // Kiểm tra embedding tồn tại
-      if (!face.embedding || face.embedding.length === 0) {
-        setStatus('⏳ Đang phân tích...', '');
-        return;
-      }
+        // Kiểm tra liveness
+        const liveness = face.liveness ?? 1;
+        if (liveness < 0.35) {
+            setStatus('🚫 Phát hiện ảnh giả mạo!', 'error');
+            reticle.className = 'error'; goodFrames = 0; return;
+        }
 
-      // Tích lũy frame tốt
-      goodFrames++;
-      reticle.className = 'active';
-      setStatus(`✅ Giữ yên... (${goodFrames}/3)`, 'success');
+        // Kiểm tra embedding
+        if (!face.embedding || face.embedding.length === 0) {
+            setStatus('⏳ Đang phân tích...', '');
+            return;
+        }
 
-      if (goodFrames < 3) return;
+        // Tích lũy frame tốt
+        goodFrames++;
+        reticle.className = 'active';
+        setStatus(`✅ Giữ yên... (${goodFrames}/3)`, 'success');
 
-      // Đủ 3 frame — xử lý
-      clearInterval(scanInterval);
-      isProcessing = true;
+        if (goodFrames < 3) return;
 
-      const embedding = Array.from(face.embedding);
+        // Đủ 3 frame — xử lý
+        clearInterval(scanInterval);
+        isProcessing = true;
 
-      if (workMode === 'ENROLL') {
-        doEnroll(embedding);
-      } else {
-        doVerify(embedding);
-      }
+        const embedding = Array.from(face.embedding);
+
+        if (workMode === 'ENROLL') {
+            doEnroll(embedding);
+        } else {
+            doVerify(embedding);
+        }
 
     }, 350);
-  }
+}
 
   // ---- Đăng ký khuôn mặt ----
   function doEnroll(embedding) {
