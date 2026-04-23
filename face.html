@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Face Scanner Auto Guided</title>
-  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <title>Face Scanner (Powered by Human AI)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/human/dist/human.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
@@ -33,34 +33,32 @@
 </head>
 <body>
 
-<div id="status-bar">Đang tải cấu hình AI...</div>
+<div id="status-bar">Đang tải hệ thống AI...</div>
 <div id="video-wrapper"><video id="video" autoplay muted playsinline></video></div>
 <div id="guide-overlay"><div id="guide-reticle"></div></div>
 <div id="action-area"><button id="btnRetry" type="button" class="hidden">🔄 Thử Lại</button></div>
 
 <script>
-  const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-  
   const video = document.getElementById('video');
   const statusEl = document.getElementById('status-bar');
   const reticleEl = document.getElementById('guide-reticle');
   const btnRetry = document.getElementById('btnRetry');
 
+  let human = null;
   let maNV = '';
-  let faceData = null;
-  let workMode = 'VERIFY'; // Mặc định là xác thực
+  let faceData = null; // Sẽ lưu mảng embedding (1024 số)
+  let workMode = 'VERIFY'; 
   
-  let modelsLoaded = false;
   let guidanceInterval = null; 
   let isProcessing = false; 
   let goodFrames = 0; 
 
+  // Lắng nghe tín hiệu từ trang chính (index.html)
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'INIT') {
         maNV = e.data.maNV || '';
-        // Đọc mode truyền vào: ENROLL hoặc VERIFY
         workMode = e.data.mode || 'VERIFY';
-        faceData = e.data.faceData ? new Float32Array(JSON.parse(e.data.faceData)) : null;
+        faceData = e.data.faceData ? JSON.parse(e.data.faceData) : null;
     }
 
     if (e.data && e.data.type === 'ENROLL_RESULT') {
@@ -75,34 +73,55 @@
     }
   });
 
-  window.addEventListener('load', () => window.parent.postMessage({ type: 'IFRAME_READY' }, '*'));
+  window.addEventListener('load', () => {
+      window.parent.postMessage({ type: 'IFRAME_READY' }, '*');
+      initHuman();
+  });
+
   function sendToParent(type, payload) { window.parent.postMessage({ type, ...payload }, '*'); }
   function setStatus(msg, type = '') { statusEl.textContent = msg; statusEl.className = type; }
   function stopCamera() { const stream = video.srcObject; if (stream) stream.getTracks().forEach(track => track.stop()); }
-  const getDistance = (p1, p2) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 
-  async function init() {
-    setStatus('Đang tải AI...', 'warning');
+  // Khởi tạo thư viện Human
+  async function initHuman() {
+    setStatus('Đang tải AI (Liveness)...', 'warning');
+    
+    // Cấu hình tải models. Sử dụng CDN chuẩn để tránh lỗi 404/CORS.
+    const config = {
+      modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human/models',
+      filter: { enabled: true, equalization: true }, // Tự động cân bằng sáng
+      face: {
+        enabled: true,
+        detector: { return: true, rotation: true },
+        mesh: { enabled: true },
+        description: { enabled: true }, // Bắt buộc bật để lấy mã sinh trắc (embedding)
+        liveness: { enabled: true },    // BẬT CHỐNG GIẢ MẠO (Ảnh/Video)
+        emotion: { enabled: false },
+        iris: { enabled: false }
+      },
+      body: { enabled: false },
+      hand: { enabled: false },
+      object: { enabled: false },
+      gesture: { enabled: false }
+    };
+
     try {
-      if (!modelsLoaded) {
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-        ]);
-        modelsLoaded = true;
-      }
-      
+      human = new Human(config);
+      await human.load();   // Tải models
+      await human.warmup(); // Khởi động engine
+
       setStatus('Đang mở Camera...', 'warning');
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 } }, audio: false });
       video.srcObject = stream;
-      await video.play();
-
-      setStatus('Vui lòng đưa mặt vào khung hình', '');
-      startAutoScan();
-
+      
+      video.onloadeddata = () => {
+          video.play();
+          setStatus('Vui lòng đưa mặt vào khung hình', '');
+          startAutoScan();
+      };
     } catch (err) {
-      setStatus('Lỗi: Trình duyệt chặn Camera!', 'error');
+      setStatus('Lỗi: Không thể tải AI hoặc Trình duyệt chặn Camera!', 'error');
+      console.error(err);
     }
   }
 
@@ -115,70 +134,87 @@
     if(guidanceInterval) clearInterval(guidanceInterval);
     
     guidanceInterval = setInterval(async () => {
-        if (isProcessing) return;
+        if (isProcessing || !human) return;
 
-        const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+        // Quét khuôn mặt
+        const result = await human.detect(video);
+        const faces = result.face;
 
-        if (!det) {
+        if (!faces || faces.length === 0) {
             setStatus('👀 Không tìm thấy khuôn mặt', 'warning');
             reticleEl.className = '';
             goodFrames = 0;
             return;
         }
 
-        const videoW = video.videoWidth || 320;
-        const faceW = det.detection.box.width;
+        if (faces.length > 1) {
+            setStatus('👥 Quá nhiều khuôn mặt! Hãy đứng 1 mình.', 'warning');
+            reticleEl.className = '';
+            goodFrames = 0;
+            return;
+        }
+
+        const face = faces[0];
+
+        // 1. Kiểm tra kích thước khuôn mặt (Khoảng cách gần xa)
+        const videoW = video.videoWidth || 640;
+        const faceW = face.box[2]; // Chiều rộng vùng mặt
         const ratio = faceW / videoW;
 
         if (ratio < 0.20) { setStatus('👋 Hãy đưa camera LẠI GẦN hơn', 'warning'); reticleEl.className = ''; goodFrames = 0; return; } 
-        if (ratio > 0.85) { setStatus('🤚 Hãy đưa camera RA XA một chút', 'warning'); reticleEl.className = ''; goodFrames = 0; return; }
+        if (ratio > 0.65) { setStatus('🤚 Hãy đưa camera RA XA một chút', 'warning'); reticleEl.className = ''; goodFrames = 0; return; }
 
-        if (det.detection.score < 0.6) { setStatus('💡 Ánh sáng tối hoặc mặt bị che.', 'warning'); reticleEl.className = ''; goodFrames = 0; return; }
-
-        const landmarks = det.landmarks;
-        const nose = landmarks.getNose();
-        const jawline = landmarks.getJawOutline();
-        const jawWidth = getDistance(jawline[0], jawline[16]);
-        const noseToJawLeft = getDistance(nose[0], jawline[0]);
-        const noseRatio = noseToJawLeft / jawWidth;
-
-        if (noseRatio < 0.35 || noseRatio > 0.65) {
+        // 2. Kiểm tra góc quay đầu (Nhìn thẳng)
+        const yaw = face.rotation?.angle?.yaw || 0;
+        const pitch = face.rotation?.angle?.pitch || 0;
+        // Góc nghiêng > 0.25 radian (~14 độ) là quá nghiêng
+        if (Math.abs(yaw) > 0.25 || Math.abs(pitch) > 0.25) {
             setStatus('👤 Vui lòng nhìn THẲNG vào camera', 'warning');
             reticleEl.className = '';
             goodFrames = 0;
             return;
         }
 
+        // 3. TÍNH NĂNG ĐỈNH CAO: KIỂM TRA THỰC GIẢ (ANTI-SPOOFING)
+        // Độ tin cậy từ 0 -> 1. Dưới 0.4 khả năng cao là đưa điện thoại hoặc ảnh in vào.
+        if (face.live < 0.4) {
+            setStatus('🚫 CẢNH BÁO: Phát hiện ảnh giả mạo!', 'error');
+            reticleEl.className = 'error';
+            goodFrames = 0;
+            return;
+        }
+
+        // Vượt qua mọi bài test
         goodFrames++;
         reticleEl.className = 'active';
         
         if (goodFrames === 1) setStatus('✅ Giữ yên khuôn mặt...', 'success');
-        if (goodFrames === 2) setStatus('✅ Đang xử lý...', 'success');
+        if (goodFrames === 2) setStatus('✅ Đang trích xuất dữ liệu...', 'success');
 
         if (goodFrames >= 3) {
             clearInterval(guidanceInterval);
             isProcessing = true;
             
-            // PHÂN NHÁNH XỬ LÝ THEO CHẾ ĐỘ (MODE)
             if (workMode === 'ENROLL') {
-                executeAutoEnroll(det.descriptor);
+                executeAutoEnroll(face.embedding);
             } else {
-                executeAutoVerify(det.descriptor);
+                executeAutoVerify(face.embedding);
             }
         }
     }, 300); 
   }
 
-  // --- TỰ ĐỘNG ĐĂNG KÝ (DÙNG CHO ADMIN VÀ SV LẦN ĐẦU) ---
-  async function executeAutoEnroll(descriptor) {
+  // --- ĐĂNG KÝ KHUÔN MẶT MỚI ---
+  async function executeAutoEnroll(embedding) {
       setStatus('⏳ Đang tạo mã sinh trắc...', 'warning');
-      const descriptorStr = JSON.stringify(Array.from(descriptor));
+      // Thư viện human trả về embedding là mảng Float32, ta chuyển thành Array thuần để gửi
+      const descriptorStr = JSON.stringify(Array.from(embedding));
       sendToParent('ENROLL', { maNV, descriptor: descriptorStr });
       setStatus('Đang lưu dữ liệu lên hệ thống...');
   }
 
-  // --- TỰ ĐỘNG XÁC THỰC (DÙNG KHI CHẤM CÔNG) ---
-  async function executeAutoVerify(currentDescriptor) {
+  // --- XÁC THỰC KHUÔN MẶT (CHẤM CÔNG) ---
+  async function executeAutoVerify(currentEmbedding) {
       setStatus('⏳ Đang đối chiếu dữ liệu...', 'warning');
       if (!faceData) {
           setStatus('❌ Dữ liệu lỗi! Bạn chưa có khuôn mặt.', 'error');
@@ -187,18 +223,22 @@
           return;
       }
 
-      const distance = faceapi.euclideanDistance(currentDescriptor, faceData);
+      // Human dùng hàm tính toán độ giống nhau (Similarity). Max là 1.
+      const similarity = human.match.similarity(currentEmbedding, faceData);
       
-      if (distance < 0.55) {
+      // NGƯỠNG SIẾT CHẶT: Lớn hơn 0.65 mới tính là 1 người (Rất bảo mật)
+      if (similarity > 0.65) {
           setStatus('✅ Nhận diện thành công!', 'success');
           reticleEl.className = 'active';
-          sendToParent('VERIFIED', { maNV, distance });
+          sendToParent('VERIFIED', { maNV, distance: similarity });
           stopCamera();
       } else {
-          setStatus('❌ Khuôn mặt không khớp! Bấm "Thử Lại"', 'error');
+          // Ghi chú log ra console độ giống nhau để admin dễ test
+          console.log("Similarity Score:", similarity); 
+          setStatus('❌ Khuôn mặt không khớp người dùng!', 'error');
           reticleEl.className = 'error';
           btnRetry.classList.remove('hidden');
-          sendToParent('FAILED', { maNV, distance });
+          sendToParent('FAILED', { maNV, distance: similarity });
       }
   }
 
@@ -207,13 +247,6 @@
       setStatus('Vui lòng đưa mặt vào khung hình', '');
       startAutoScan(); 
   };
-
-  let checkLoad = setInterval(() => {
-     if (typeof faceapi !== 'undefined') {
-         clearInterval(checkLoad);
-         init();
-     }
-  }, 100);
 </script>
 </body>
 </html>
