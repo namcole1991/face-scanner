@@ -87,8 +87,8 @@
     setStatus('Đang tải AI (Liveness)...', 'warning');
     
     const config = {
-      // SỬA DÒNG NÀY: Dùng đường dẫn tuyệt đối trỏ thẳng vào GitHub Pages của bạn
-      modelBasePath: 'https://namcole1991-web.github.io/face-scanner/models', 
+      // SỬA DÒNG NÀY: Dùng lại CDN chính thức để đảm bảo không thiếu file AI nào
+      modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human/models', 
       filter: { enabled: true, equalization: true },
       face: {
         enabled: true,
@@ -108,7 +108,7 @@
     try {
       human = new Human(config);
       await human.load();   
-      await human.warmup(); 
+      await human.warmup();
 
       setStatus('Đang mở Camera...', 'warning');
       const stream = await navigator.mediaDevices.getUserMedia({ 
