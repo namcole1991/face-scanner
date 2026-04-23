@@ -295,8 +295,8 @@ const callServer = async (func, ...args) => {
             // RBAC: Filter Menu Items
             const allMenuItems = [
                 { id: 'dashboard', label: 'Tổng quan', icon: Icons.Dashboard, roles: ['ADMIN'] },
-                { id: 'timekeeping', label: 'Chấm công', icon: 'fact_check', roles: ['ADMIN'] },
-                { id: 'gps_checkin', label: 'Chấm công GPS', icon: 'my_location', roles: ['EMPLOYEE'] },
+                { id: 'timekeeping', label: 'Điểm danh', icon: 'fact_check', roles: ['ADMIN'] },
+                { id: 'gps_checkin', label: 'Điểm danh GPS', icon: 'my_location', roles: ['EMPLOYEE'] },
                 { id: 'calendar', label: 'Lịch làm việc', icon: 'calendar_month', roles: ['ADMIN'] },
                 { id: 'employees', label: 'Nhân sự', icon: Icons.Employees, roles: ['ADMIN'] },
                 { id: 'departments', label: 'Phòng ban', icon: Icons.Departments, roles: ['ADMIN'] },
@@ -586,7 +586,7 @@ const callServer = async (func, ...args) => {
 
                             {/* --- ATTENDANCE CHARTS --- */}
                             <Grid item xs={12} md={4}>
-                                <ChartBox title="Tỷ Lệ Chấm Công Hôm Nay">
+                                <ChartBox title="Tỷ Lệ Điểm danh Hôm Nay">
                                     <PieChart>
                                         <Pie data={stats.charts.attendanceToday || []} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
                                             {(stats.charts.attendanceToday || []).map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
@@ -2263,7 +2263,7 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                 }));
 
                 callServer('saveAttendance', dateStr, records).then(() => {
-                    setToast({ open: true, msg: 'Đã lưu chấm công!' });
+                    setToast({ open: true, msg: 'Đã lưu Điểm danh!' });
                     setLoading(false);
                 }).catch(() => {
                     setToast({ open: true, msg: 'Lỗi khi lưu!' });
@@ -2281,7 +2281,7 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <IconButton onClick={() => handleDateChange(-1)} size="small"><span className="material-icons">chevron_left</span></IconButton>
-                            <Typography variant="h5" color="textPrimary">Chấm Công {selectedDate.toLocaleDateString('vi-VN')}</Typography>
+                            <Typography variant="h5" color="textPrimary">Điểm danh {selectedDate.toLocaleDateString('vi-VN')}</Typography>
                             <IconButton onClick={() => handleDateChange(1)} size="small"><span className="material-icons">chevron_right</span></IconButton>
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1 }}>
@@ -2295,7 +2295,7 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                             <Typography variant="subtitle1" fontWeight="bold">Danh sách nhân viên</Typography>
                             <Box sx={{ display: 'flex', gap: 1 }}>
-                                <Button variant="contained" color="primary" onClick={markAllPresent}>Chấm công tất cả</Button>
+                                <Button variant="contained" color="primary" onClick={markAllPresent}>Điểm danh tất cả</Button>
                                 <Button variant="contained" color="success" onClick={handleSave} disabled={loading}>
                                     {loading ? <CircularProgress size={24} color="inherit" /> : 'Lưu Dữ Liệu'}
                                 </Button>
@@ -2314,7 +2314,7 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                                 </TableHead>
                                 <TableBody>
                                     {employees.length === 0 ? (
-                                        <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3, color: 'text.secondary' }}>Chưa có dữ liệu nhân viên để chấm công</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3, color: 'text.secondary' }}>Chưa có dữ liệu nhân viên để điểm danh</TableCell></TableRow>
                                     ) : employees.map(emp => {
                                         const record = attendanceData[emp.maNV] || {};
                                         const leave = getEmployeeLeaveStatus(emp.maNV);
@@ -2492,7 +2492,7 @@ const handleSave = () => {
     return (
         <Box>
             <Box sx={{ mb: { xs: 2, md: 4 } }}>
-                <Typography variant="h5" sx={{ color: '#111827', fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>Cài Đặt Chấm Công</Typography>
+                <Typography variant="h5" sx={{ color: '#111827', fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>Cài Đặt Điểm Danh</Typography>
                 <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>Thiết lập tọa độ và khoảng thời gian cho phép điểm danh</Typography>
             </Box>
 
@@ -2774,7 +2774,7 @@ const GPSCheckIn = () => {
                 setShowFaceScanner(false); 
 
                 if (scannerMode === 'ENROLL') {
-                    setToast({ open: true, msg: '✅ Bạn đã đăng ký khuôn mặt thành công. Bây giờ có thể chấm công.', severity: 'success' });
+                    setToast({ open: true, msg: '✅ Bạn đã đăng ký khuôn mặt thành công. Bây giờ có thể điểm danh.', severity: 'success' });
                     return; 
                 }
 
@@ -2821,7 +2821,7 @@ const GPSCheckIn = () => {
 
                     {!hasFaceData && (
                         <Alert severity="warning" sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}>
-                            Tài khoản của bạn chưa có dữ liệu sinh trắc học. Bắt buộc phải đăng ký khuôn mặt trước khi sử dụng chức năng chấm công!
+                            Tài khoản của bạn chưa có dữ liệu sinh trắc học. Bắt buộc phải đăng ký khuôn mặt trước khi sử dụng chức năng điểm danh!
                         </Alert>
                     )}
 
@@ -2969,7 +2969,7 @@ const GPSCheckIn = () => {
                                     ) : (
                                         <Box sx={{ p: 3, textAlign: 'center', bgcolor: '#f9fafb', borderRadius: 2 }}>
                                             <span className="material-icons" style={{ fontSize: 48, color: '#d1d5db', mb: 1 }}>schedule</span>
-                                            <Typography variant="body2" color="textSecondary">Chưa chấm công hôm nay</Typography>
+                                            <Typography variant="body2" color="textSecondary">Chưa điểm danh hôm nay</Typography>
                                         </Box>
                                     )}
                                 </Paper>
@@ -3041,7 +3041,7 @@ const FaceCheckIn = ({ user, onVerified, mode = 'VERIFY' }) => {
                     iframeRef.current?.contentWindow?.postMessage({ type: 'ENROLL_RESULT', success: res.success, message: res.message }, '*');
                     
                     if (res.success) {
-                        // Cập nhật ngay dữ liệu khuôn mặt vào state để UI tự động đổi sang nút Chấm công
+                        // Cập nhật ngay dữ liệu khuôn mặt vào state để UI tự động đổi sang nút Điểm danh
                         const updatedEmployees = employees.map(emp => 
                             emp.maNV === data.maNV ? { ...emp, face_data: data.descriptor } : emp
                         );
