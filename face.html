@@ -82,20 +82,20 @@
   function setStatus(msg, type = '') { statusEl.textContent = msg; statusEl.className = type; }
   function stopCamera() { const stream = video.srcObject; if (stream) stream.getTracks().forEach(track => track.stop()); }
 
-  // Khởi tạo thư viện Human
+// Khởi tạo thư viện Human
   async function initHuman() {
     setStatus('Đang tải AI (Liveness)...', 'warning');
     
-    // Cấu hình tải models. Sử dụng CDN chuẩn để tránh lỗi 404/CORS.
     const config = {
-      modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human/models',
-      filter: { enabled: true, equalization: true }, // Tự động cân bằng sáng
+      // ĐỔI ĐƯỜNG DẪN MODELS SANG SERVER CỦA TÁC GIẢ
+      modelBasePath: 'https://vladmandic.github.io/human/models', 
+      filter: { enabled: true, equalization: true },
       face: {
         enabled: true,
         detector: { return: true, rotation: true },
         mesh: { enabled: true },
-        description: { enabled: true }, // Bắt buộc bật để lấy mã sinh trắc (embedding)
-        liveness: { enabled: true },    // BẬT CHỐNG GIẢ MẠO (Ảnh/Video)
+        description: { enabled: true }, 
+        liveness: { enabled: true },    
         emotion: { enabled: false },
         iris: { enabled: false }
       },
@@ -107,11 +107,14 @@
 
     try {
       human = new Human(config);
-      await human.load();   // Tải models
-      await human.warmup(); // Khởi động engine
+      await human.load();   
+      await human.warmup(); 
 
       setStatus('Đang mở Camera...', 'warning');
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 } }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user', width: { ideal: 640 } }, 
+          audio: false 
+      });
       video.srcObject = stream;
       
       video.onloadeddata = () => {
@@ -120,8 +123,14 @@
           startAutoScan();
       };
     } catch (err) {
-      setStatus('Lỗi: Không thể tải AI hoặc Trình duyệt chặn Camera!', 'error');
-      console.error(err);
+      // IN CHI TIẾT LỖI RA CONSOLE ĐỂ ADMIN DỄ BẮT BỆNH
+      console.error("CHI TIẾT LỖI HUMAN AI:", err);
+      
+      if (err.name === 'NotAllowedError' || err.name === 'NotFoundError') {
+          setStatus('Lỗi: Trình duyệt hoặc Iframe đang chặn Camera!', 'error');
+      } else {
+          setStatus('Lỗi: Không thể tải dữ liệu AI (Models)!', 'error');
+      }
     }
   }
 
