@@ -367,9 +367,9 @@ function checkOcclusion(face) {
 
     // Kính gọng dày làm avgBrowEyeDist tăng (> 0.12)
     // hoặc làm EAR tăng bất thường (> 0.38) do frame kính
-    if (avgBrowEyeDist > 0.12 || avgEAR > 0.38) {
-        result.glasses = true;
-    }
+    if (avgBrowEyeDist > 0.16 || avgEAR > 0.42) {
+    result.glasses = true;
+}
 
     // ============================================
     // PHÁT HIỆN KHẨU TRANG / CHE MIỆNG
@@ -412,9 +412,9 @@ function checkOcclusion(face) {
     // - mouthWidthRatio < 0.35: miệng quá hẹp so với mặt
     // - noseChinDist < 0.30: khoảng mũi-cằm bị thu ngắn
     const isMouthCovered =
-        (lipHeight < 0.025) ||
-        (mouthWidthRatio < 0.35 && noseChinDist < 0.32) ||
-        (noseChinDist < 0.28);
+    (lipHeight < 0.010) ||
+    (mouthWidthRatio < 0.28 && noseChinDist < 0.28) ||
+    (noseChinDist < 0.24);
 
     if (isMouthCovered) {
         result.mask = true;
