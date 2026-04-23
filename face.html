@@ -82,13 +82,12 @@
   function setStatus(msg, type = '') { statusEl.textContent = msg; statusEl.className = type; }
   function stopCamera() { const stream = video.srcObject; if (stream) stream.getTracks().forEach(track => track.stop()); }
 
-// Khởi tạo thư viện Human
-  async function initHuman() {
+async function initHuman() {
     setStatus('Đang tải AI (Liveness)...', 'warning');
     
     const config = {
-      // ĐỔI ĐƯỜNG DẪN MODELS SANG SERVER CỦA TÁC GIẢ
-      modelBasePath: 'https://vladmandic.github.io/human/models', 
+      // SỬA DÒNG NÀY: Trỏ trực tiếp vào thư mục models bạn vừa up lên GitHub
+      modelBasePath: 'models', 
       filter: { enabled: true, equalization: true },
       face: {
         enabled: true,
