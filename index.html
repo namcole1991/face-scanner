@@ -2814,12 +2814,17 @@ const GPSCheckIn = () => {
             )}
 
 {/* HIỂN THỊ CẢNH BÁO THỜI GIAN */}
-            {hasFaceData && officeLocation && !isTimeValid && (
-                <Alert severity="error" sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}>
-                    {timeWarningMsg}
-                </Alert>
-            )}
-
+{hasFaceData && officeLocation && !isTimeValid && (
+    <Alert severity="error" sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}>
+        {timeWarningMsg}
+    </Alert>
+)}
+{/* HIỂN THỊ THÔNG BÁO THỜI GIAN HỢP LỆ */}
+{hasFaceData && officeLocation && isTimeValid && !todayRecord && (
+    <Alert severity="info" sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}>
+        💡 Thời gian cho phép điểm danh hôm nay: từ {officeLocation.time_start} đến {officeLocation.time_end}
+    </Alert>
+)}
             <Grid container spacing={{ xs: 2, md: 3 }}>
                 <Grid item xs={12} md={7}>
                     <Paper sx={{
@@ -2928,19 +2933,17 @@ const GPSCheckIn = () => {
                             {todayRecord ? (
                                 <Box>
                                     <Grid container spacing={2} sx={{ mb: 2 }}>
-                                        <Grid item xs={6}>
-                                            <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, textAlign: 'center', borderRadius: 2, bgcolor: '#f0fdf4', borderColor: '#bbf7d0' }}>
-                                                <Typography variant="caption" color="textSecondary">Giờ vào</Typography>
-                                                <Typography variant="h6" sx={{ fontWeight: 800, color: '#16a34a', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>{todayRecord.gioVao || '--:--'}</Typography>
-                                            </Paper>
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, textAlign: 'center', borderRadius: 2, bgcolor: todayRecord.gioRa ? '#fef2f2' : '#f9fafb', borderColor: todayRecord.gioRa ? '#fecaca' : '#e5e7eb' }}>
-                                                <Typography variant="caption" color="textSecondary">Giờ ra</Typography>
-                                                <Typography variant="h6" sx={{ fontWeight: 800, color: todayRecord.gioRa ? '#dc2626' : '#9ca3af', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>{todayRecord.gioRa || '--:--'}</Typography>
-                                            </Paper>
-                                        </Grid>
-                                    </Grid>
+    <Grid item xs={12}>
+        <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, textAlign: 'center', borderRadius: 2, bgcolor: '#f0fdf4', borderColor: '#bbf7d0' }}>
+            <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.9rem' }}>
+                Thời gian điểm danh thành công
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#16a34a', fontSize: { xs: '1.25rem', md: '1.5rem' }, mt: 0.5 }}>
+                {todayRecord.gioVao || '--:--'}
+            </Typography>
+        </Paper>
+    </Grid>
+</Grid>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                         <Chip
                                             label={todayRecord.trangThai}
