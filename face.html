@@ -3,249 +3,399 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Face Scanner (Powered by Human AI)</title>
-  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/human/dist/human.js"></script>
+  <title>Face Scanner</title>
+
+  <!--
+    QUAN TRỌNG: Load human.js từ CDN unpkg thay vì jsdelivr
+    unpkg ổn định hơn cho package này
+  -->
+  <script src="https://unpkg.com/@vladmandic/human@3.3.4/dist/human.js"></script>
+
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
-    
+
     #video-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); filter: brightness(1.15) contrast(1.05); }
-    
+    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); filter: brightness(1.1) contrast(1.05); }
+
     #guide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; }
-    
-    #guide-reticle { width: 70vw; max-width: 280px; aspect-ratio: 3/4; height: auto; border: 3px dashed rgba(255,255,255,0.8); border-radius: 50%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.65); transition: all 0.3s ease; }
-    #guide-reticle.active { border-color: #10b981; border-style: solid; box-shadow: 0 0 20px rgba(16,185,129,0.5), 0 0 0 9999px rgba(0,0,0,0.65); transform: scale(1.02); }
-    #guide-reticle.error { border-color: #ef4444; border-style: solid; box-shadow: 0 0 20px rgba(239,68,68,0.5), 0 0 0 9999px rgba(0,0,0,0.65); }
+    #guide-reticle {
+      width: 70vw; max-width: 280px; aspect-ratio: 3/4;
+      border: 3px dashed rgba(255,255,255,0.8); border-radius: 50%;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.65); transition: all 0.3s ease;
+    }
+    #guide-reticle.active {
+      border-color: #10b981; border-style: solid;
+      box-shadow: 0 0 20px rgba(16,185,129,0.5), 0 0 0 9999px rgba(0,0,0,0.65);
+    }
+    #guide-reticle.error {
+      border-color: #ef4444; border-style: solid;
+      box-shadow: 0 0 20px rgba(239,68,68,0.5), 0 0 0 9999px rgba(0,0,0,0.65);
+    }
 
-    #status-bar { position: absolute; top: 5%; left: 50%; transform: translateX(-50%); width: 90%; max-width: 340px; background: rgba(31, 41, 55, 0.95); backdrop-filter: blur(8px); padding: 14px 16px; border-radius: 12px; text-align: center; font-weight: 600; font-size: 15px; z-index: 3; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s; }
-    #status-bar.warning { background: #fffbeb; color: #b45309; border-color: #fde68a; }
-    #status-bar.success { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
-    #status-bar.error { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+    #status-bar {
+      position: absolute; top: 5%; left: 50%; transform: translateX(-50%);
+      width: 90%; max-width: 340px;
+      background: rgba(31,41,55,0.95); backdrop-filter: blur(8px);
+      padding: 14px 16px; border-radius: 12px; text-align: center;
+      font-weight: 600; font-size: 15px; z-index: 3;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
+      transition: all 0.3s;
+    }
+    #status-bar.warning { background: rgba(146,64,14,0.92); }
+    #status-bar.success { background: rgba(4,120,87,0.92); }
+    #status-bar.error   { background: rgba(185,28,28,0.92); }
 
-    #action-area { position: absolute; bottom: 5%; left: 0; width: 100%; display: flex; justify-content: center; gap: 12px; z-index: 3; padding: 0 20px; }
-    button { padding: 16px 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; font-size: 16px; width: 100%; max-width: 250px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; gap: 8px;}
-    button:active { transform: scale(0.96); }
-    
-    #btnRetry { background: linear-gradient(135deg,#ef4444,#dc2626); color: #fff; display: none; }
-    .hidden { display: none !important; }
+    /* Progress bar */
+    #progress-wrap {
+      position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%);
+      width: 80%; max-width: 300px; z-index: 3;
+    }
+    #progress-track { width:100%; height:6px; background:rgba(255,255,255,0.2); border-radius:3px; overflow:hidden; }
+    #progress-fill  { height:100%; width:0%; background:linear-gradient(90deg,#6366f1,#10b981); border-radius:3px; transition:width 0.4s ease; }
+    #progress-label { text-align:center; font-size:12px; color:rgba(255,255,255,0.65); margin-top:5px; }
+
+    #action-area { position: absolute; bottom: 5%; left: 0; width: 100%; display: flex; justify-content: center; z-index: 3; padding: 0 20px; }
+    #btnRetry {
+      padding: 16px 24px; border-radius: 12px; border: none; cursor: pointer;
+      font-weight: 700; font-size: 16px; width: 100%; max-width: 250px;
+      background: linear-gradient(135deg,#ef4444,#dc2626); color: #fff; display: none;
+    }
+    #btnRetry:active { transform: scale(0.96); }
   </style>
 </head>
 <body>
 
-<div id="status-bar">Đang tải hệ thống AI...</div>
+<div id="status-bar">Đang khởi tạo...</div>
 <div id="video-wrapper"><video id="video" autoplay muted playsinline></video></div>
 <div id="guide-overlay"><div id="guide-reticle"></div></div>
-<div id="action-area"><button id="btnRetry" type="button" class="hidden">🔄 Thử Lại</button></div>
+
+<div id="progress-wrap">
+  <div id="progress-track"><div id="progress-fill"></div></div>
+  <div id="progress-label"></div>
+</div>
+
+<div id="action-area">
+  <button id="btnRetry" type="button">🔄 Thử Lại</button>
+</div>
 
 <script>
-  const video = document.getElementById('video');
-  const statusEl = document.getElementById('status-bar');
-  const reticleEl = document.getElementById('guide-reticle');
-  const btnRetry = document.getElementById('btnRetry');
+  // =========================================================
+  // CẤU HÌNH — chỉnh BASE_URL trỏ đúng repo GitHub Pages bạn
+  // VD: 'https://ten-user.github.io/ten-repo/models'
+  // =========================================================
+  const MODEL_BASE_URL = 'https://namcole1991-web.github.io/face-scanner/models';
+  // Nếu bạn muốn fallback dùng CDN khi models chưa có trên GitHub:
+  // const MODEL_BASE_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/human/models';
 
-  let human = null;
-  let maNV = '';
-  let faceData = null; // Sẽ lưu mảng embedding (1024 số)
-  let workMode = 'VERIFY'; 
-  
-  let guidanceInterval = null; 
-  let isProcessing = false; 
-  let goodFrames = 0; 
+  // =========================================================
 
-  // Lắng nghe tín hiệu từ trang chính (index.html)
+  const video       = document.getElementById('video');
+  const statusEl    = document.getElementById('status-bar');
+  const reticle     = document.getElementById('guide-reticle');
+  const btnRetry    = document.getElementById('btnRetry');
+  const progressFill  = document.getElementById('progress-fill');
+  const progressLabel = document.getElementById('progress-label');
+  const progressWrap  = document.getElementById('progress-wrap');
+
+  let human        = null;
+  let maNV         = '';
+  let faceData     = null;
+  let workMode     = 'VERIFY';
+  let scanInterval = null;
+  let isProcessing = false;
+  let goodFrames   = 0;
+
+  // ---- Nhận message từ trang cha ----
   window.addEventListener('message', (e) => {
-    if (e.data && e.data.type === 'INIT') {
-        maNV = e.data.maNV || '';
-        workMode = e.data.mode || 'VERIFY';
-        faceData = e.data.faceData ? JSON.parse(e.data.faceData) : null;
+    if (e.data?.type === 'INIT') {
+      maNV     = e.data.maNV || '';
+      workMode = e.data.mode  || 'VERIFY';
+      faceData = e.data.faceData ? JSON.parse(e.data.faceData) : null;
     }
-
-    if (e.data && e.data.type === 'ENROLL_RESULT') {
-        if (e.data.success) {
-            setStatus('✅ Đã lưu khuôn mặt vào hệ thống!', 'success');
-            stopCamera();
-        } else {
-            setStatus('❌ Lỗi lưu: ' + e.data.message, 'error');
-            reticleEl.className = 'error';
-            btnRetry.classList.remove('hidden'); 
-        }
+    if (e.data?.type === 'ENROLL_RESULT') {
+      if (e.data.success) {
+        setStatus('✅ Đã lưu khuôn mặt!', 'success');
+        stopCamera();
+      } else {
+        setStatus('❌ Lỗi lưu: ' + e.data.message, 'error');
+        reticle.className = 'error';
+        showRetry();
+      }
     }
   });
 
   window.addEventListener('load', () => {
-      window.parent.postMessage({ type: 'IFRAME_READY' }, '*');
-      initHuman();
+    window.parent.postMessage({ type: 'IFRAME_READY' }, '*');
+    initHuman();
   });
 
-  function sendToParent(type, payload) { window.parent.postMessage({ type, ...payload }, '*'); }
-  function setStatus(msg, type = '') { statusEl.textContent = msg; statusEl.className = type; }
-  function stopCamera() { const stream = video.srcObject; if (stream) stream.getTracks().forEach(track => track.stop()); }
+  // ---- Helpers ----
+  function send(type, payload) { window.parent.postMessage({ type, ...payload }, '*'); }
+  function setStatus(msg, cls = '') { statusEl.textContent = msg; statusEl.className = cls; }
+  function stopCamera() { video.srcObject?.getTracks().forEach(t => t.stop()); }
+  function showRetry()  { btnRetry.style.display = 'block'; }
+  function hideRetry()  { btnRetry.style.display = 'none'; }
+  function setProgress(pct, label) {
+    progressWrap.style.display = 'block';
+    progressFill.style.width   = pct + '%';
+    progressLabel.textContent  = label;
+  }
+  function hideProgress() {
+    progressWrap.style.display = 'none';
+  }
 
-  // Khởi tạo thư viện Human
+  // ---- Khởi tạo Human.js ----
   async function initHuman() {
-    setStatus('Đang tải AI (Liveness)...', 'warning');
-    
-    // Cấu hình tải models. Sử dụng CDN chuẩn để tránh lỗi 404/CORS.
-    const config = {
-      modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human/models',
-      filter: { enabled: true, equalization: true }, // Tự động cân bằng sáng
-      face: {
-        enabled: true,
-        detector: { return: true, rotation: true },
-        mesh: { enabled: true },
-        description: { enabled: true }, // Bắt buộc bật để lấy mã sinh trắc (embedding)
-        liveness: { enabled: true },    // BẬT CHỐNG GIẢ MẠO (Ảnh/Video)
-        emotion: { enabled: false },
-        iris: { enabled: false }
-      },
-      body: { enabled: false },
-      hand: { enabled: false },
-      object: { enabled: false },
-      gesture: { enabled: false }
-    };
-
     try {
-      human = new Human(config);
-      await human.load();   // Tải models
-      await human.warmup(); // Khởi động engine
+      setStatus('Đang tải AI...', 'warning');
+      setProgress(5, 'Chuẩn bị...');
 
-      setStatus('Đang mở Camera...', 'warning');
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 } }, audio: false });
-      video.srcObject = stream;
-      
-      video.onloadeddata = () => {
-          video.play();
-          setStatus('Vui lòng đưa mặt vào khung hình', '');
-          startAutoScan();
+      // ---- Cấu hình Human ----
+      const config = {
+        // Trỏ models về GitHub Pages của bạn
+        modelBasePath: MODEL_BASE_URL,
+
+        // Tắt backend mặc định để tránh lỗi WebGL trên một số trình duyệt
+        // 'webgl' nhanh nhất, fallback 'cpu' nếu lỗi
+        backend: 'webgl',
+
+        // Chỉ bật những gì cần dùng — tắt hết phần còn lại để nhẹ hơn
+        face: {
+          enabled: true,
+          detector:    { enabled: true,  rotation: true, return: true, minConfidence: 0.4 },
+          mesh:        { enabled: true  },
+          description: { enabled: true  },  // Bắt buộc để lấy embedding
+          liveness:    { enabled: true  },  // Chống ảnh giả
+          emotion:     { enabled: false },
+          iris:        { enabled: false },
+          age:         { enabled: false },
+          gender:      { enabled: false },
+        },
+        body:    { enabled: false },
+        hand:    { enabled: false },
+        object:  { enabled: false },
+        gesture: { enabled: false },
+        segmentation: { enabled: false },
+
+        // Giảm kích thước input để xử lý nhanh hơn
+        filter: {
+          enabled: true,
+          equalization: true,  // Tự cân bằng sáng
+          width: 0,            // 0 = giữ nguyên kích thước video
+        },
+
+        // Ngưỡng và tốc độ
+        async: true,
+        warmup: 'none',        // Sẽ warmup thủ công bên dưới
       };
+
+      human = new Human(config);
+
+      // Lắng nghe tiến trình tải model
+      human.events.addEventListener('load', (evt) => {
+        const pct = Math.round((evt.loaded / Math.max(evt.total, 1)) * 70) + 10;
+        setProgress(pct, `Tải model... ${evt.loaded}/${evt.total}`);
+      });
+
+      // Tải models
+      setProgress(10, 'Đang tải models...');
+      await human.load();
+      setProgress(85, 'Khởi động engine...');
+
+      // Warmup — chạy 1 lần rỗng để JIT compile WebGL shaders
+      await human.warmup();
+      setProgress(100, 'Hoàn tất!');
+      setTimeout(hideProgress, 500);
+
+      // Mở camera
+      setStatus('Đang mở Camera...', 'warning');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false
+      });
+      video.srcObject = stream;
+      video.onloadeddata = () => {
+        video.play();
+        setStatus('Đưa mặt vào khung hình', '');
+        startScan();
+      };
+
     } catch (err) {
-      setStatus('Lỗi: Không thể tải AI hoặc Trình duyệt chặn Camera!', 'error');
-      console.error(err);
+      console.error('initHuman error:', err);
+      hideProgress();
+
+      // Phân loại lỗi để hiển thị rõ ràng
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setStatus('❌ Camera bị chặn! Hãy cấp quyền và thử lại.', 'error');
+      } else if (err.name === 'NotFoundError') {
+        setStatus('❌ Không tìm thấy Camera.', 'error');
+      } else if (String(err).includes('404') || String(err).includes('model')) {
+        setStatus('❌ Không tải được models! Kiểm tra thư mục /models trên GitHub.', 'error');
+      } else if (String(err).includes('webgl') || String(err).includes('WebGL')) {
+        // Fallback sang CPU nếu WebGL lỗi
+        setStatus('⚠️ WebGL không khả dụng, đang thử CPU...', 'warning');
+        retryWithCPU();
+        return;
+      } else {
+        setStatus('❌ Lỗi: ' + err.message, 'error');
+      }
+      reticle.className = 'error';
+      showRetry();
     }
   }
 
-  function startAutoScan() {
+  // Fallback CPU khi WebGL lỗi
+  async function retryWithCPU() {
+    try {
+      human.config.backend = 'cpu';
+      await human.load();
+      await human.warmup();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' }, audio: false
+      });
+      video.srcObject = stream;
+      video.onloadeddata = () => { video.play(); setStatus('Đưa mặt vào khung hình', ''); startScan(); };
+    } catch (err2) {
+      setStatus('❌ Lỗi khởi tạo: ' + err2.message, 'error');
+      reticle.className = 'error';
+      showRetry();
+    }
+  }
+
+  // ---- Vòng quét chính ----
+  function startScan() {
+    if (scanInterval) clearInterval(scanInterval);
     isProcessing = false;
-    goodFrames = 0;
-    reticleEl.className = '';
-    btnRetry.classList.add('hidden'); 
+    goodFrames   = 0;
+    reticle.className = '';
+    hideRetry();
 
-    if(guidanceInterval) clearInterval(guidanceInterval);
-    
-    guidanceInterval = setInterval(async () => {
-        if (isProcessing || !human) return;
+    scanInterval = setInterval(async () => {
+      if (isProcessing || !human) return;
 
-        // Quét khuôn mặt
-        const result = await human.detect(video);
-        const faces = result.face;
+      const result = await human.detect(video);
+      const faces  = result?.face || [];
 
-        if (!faces || faces.length === 0) {
-            setStatus('👀 Không tìm thấy khuôn mặt', 'warning');
-            reticleEl.className = '';
-            goodFrames = 0;
-            return;
-        }
-
-        if (faces.length > 1) {
-            setStatus('👥 Quá nhiều khuôn mặt! Hãy đứng 1 mình.', 'warning');
-            reticleEl.className = '';
-            goodFrames = 0;
-            return;
-        }
-
-        const face = faces[0];
-
-        // 1. Kiểm tra kích thước khuôn mặt (Khoảng cách gần xa)
-        const videoW = video.videoWidth || 640;
-        const faceW = face.box[2]; // Chiều rộng vùng mặt
-        const ratio = faceW / videoW;
-
-        if (ratio < 0.20) { setStatus('👋 Hãy đưa camera LẠI GẦN hơn', 'warning'); reticleEl.className = ''; goodFrames = 0; return; } 
-        if (ratio > 0.65) { setStatus('🤚 Hãy đưa camera RA XA một chút', 'warning'); reticleEl.className = ''; goodFrames = 0; return; }
-
-        // 2. Kiểm tra góc quay đầu (Nhìn thẳng)
-        const yaw = face.rotation?.angle?.yaw || 0;
-        const pitch = face.rotation?.angle?.pitch || 0;
-        // Góc nghiêng > 0.25 radian (~14 độ) là quá nghiêng
-        if (Math.abs(yaw) > 0.25 || Math.abs(pitch) > 0.25) {
-            setStatus('👤 Vui lòng nhìn THẲNG vào camera', 'warning');
-            reticleEl.className = '';
-            goodFrames = 0;
-            return;
-        }
-
-        // 3. TÍNH NĂNG ĐỈNH CAO: KIỂM TRA THỰC GIẢ (ANTI-SPOOFING)
-        // Độ tin cậy từ 0 -> 1. Dưới 0.4 khả năng cao là đưa điện thoại hoặc ảnh in vào.
-        if (face.live < 0.4) {
-            setStatus('🚫 CẢNH BÁO: Phát hiện ảnh giả mạo!', 'error');
-            reticleEl.className = 'error';
-            goodFrames = 0;
-            return;
-        }
-
-        // Vượt qua mọi bài test
-        goodFrames++;
-        reticleEl.className = 'active';
-        
-        if (goodFrames === 1) setStatus('✅ Giữ yên khuôn mặt...', 'success');
-        if (goodFrames === 2) setStatus('✅ Đang trích xuất dữ liệu...', 'success');
-
-        if (goodFrames >= 3) {
-            clearInterval(guidanceInterval);
-            isProcessing = true;
-            
-            if (workMode === 'ENROLL') {
-                executeAutoEnroll(face.embedding);
-            } else {
-                executeAutoVerify(face.embedding);
-            }
-        }
-    }, 300); 
-  }
-
-  // --- ĐĂNG KÝ KHUÔN MẶT MỚI ---
-  async function executeAutoEnroll(embedding) {
-      setStatus('⏳ Đang tạo mã sinh trắc...', 'warning');
-      // Thư viện human trả về embedding là mảng Float32, ta chuyển thành Array thuần để gửi
-      const descriptorStr = JSON.stringify(Array.from(embedding));
-      sendToParent('ENROLL', { maNV, descriptor: descriptorStr });
-      setStatus('Đang lưu dữ liệu lên hệ thống...');
-  }
-
-  // --- XÁC THỰC KHUÔN MẶT (CHẤM CÔNG) ---
-  async function executeAutoVerify(currentEmbedding) {
-      setStatus('⏳ Đang đối chiếu dữ liệu...', 'warning');
-      if (!faceData) {
-          setStatus('❌ Dữ liệu lỗi! Bạn chưa có khuôn mặt.', 'error');
-          reticleEl.className = 'error';
-          btnRetry.classList.remove('hidden');
-          return;
+      // Không tìm thấy mặt
+      if (faces.length === 0) {
+        setStatus('👀 Không tìm thấy khuôn mặt', 'warning');
+        reticle.className = '';
+        goodFrames = 0;
+        return;
       }
 
-      // Human dùng hàm tính toán độ giống nhau (Similarity). Max là 1.
-      const similarity = human.match.similarity(currentEmbedding, faceData);
-      
-      // NGƯỠNG SIẾT CHẶT: Lớn hơn 0.65 mới tính là 1 người (Rất bảo mật)
-      if (similarity > 0.65) {
-          setStatus('✅ Nhận diện thành công!', 'success');
-          reticleEl.className = 'active';
-          sendToParent('VERIFIED', { maNV, distance: similarity });
-          stopCamera();
+      // Nhiều mặt
+      if (faces.length > 1) {
+        setStatus('👥 Phát hiện nhiều người! Hãy đứng 1 mình.', 'warning');
+        reticle.className = '';
+        goodFrames = 0;
+        return;
+      }
+
+      const face = faces[0];
+
+      // Kiểm tra khoảng cách (kích thước mặt so với khung hình)
+      const videoW = video.videoWidth || 640;
+      const faceW  = face.box?.[2] || 0;
+      const ratio  = faceW / videoW;
+
+      if (ratio < 0.18) {
+        setStatus('👋 Đưa mặt lại GẦN hơn', 'warning');
+        reticle.className = ''; goodFrames = 0; return;
+      }
+      if (ratio > 0.70) {
+        setStatus('🤚 Đưa mặt ra XA hơn', 'warning');
+        reticle.className = ''; goodFrames = 0; return;
+      }
+
+      // Kiểm tra góc nghiêng đầu
+      const yaw   = face.rotation?.angle?.yaw   || 0;
+      const pitch = face.rotation?.angle?.pitch || 0;
+      if (Math.abs(yaw) > 0.28 || Math.abs(pitch) > 0.28) {
+        setStatus('👤 Nhìn THẲNG vào camera', 'warning');
+        reticle.className = ''; goodFrames = 0; return;
+      }
+
+      // Kiểm tra chống giả mạo (liveness)
+      const liveness = face.liveness ?? 1; // Nếu model liveness chưa load, mặc định pass
+      if (liveness < 0.35) {
+        setStatus('🚫 Phát hiện ảnh giả mạo!', 'error');
+        reticle.className = 'error'; goodFrames = 0; return;
+      }
+
+      // Kiểm tra embedding tồn tại
+      if (!face.embedding || face.embedding.length === 0) {
+        setStatus('⏳ Đang phân tích...', '');
+        return;
+      }
+
+      // Tích lũy frame tốt
+      goodFrames++;
+      reticle.className = 'active';
+      setStatus(`✅ Giữ yên... (${goodFrames}/3)`, 'success');
+
+      if (goodFrames < 3) return;
+
+      // Đủ 3 frame — xử lý
+      clearInterval(scanInterval);
+      isProcessing = true;
+
+      const embedding = Array.from(face.embedding);
+
+      if (workMode === 'ENROLL') {
+        doEnroll(embedding);
       } else {
-          // Ghi chú log ra console độ giống nhau để admin dễ test
-          console.log("Similarity Score:", similarity); 
-          setStatus('❌ Khuôn mặt không khớp người dùng!', 'error');
-          reticleEl.className = 'error';
-          btnRetry.classList.remove('hidden');
-          sendToParent('FAILED', { maNV, distance: similarity });
+        doVerify(embedding);
       }
+
+    }, 350);
+  }
+
+  // ---- Đăng ký khuôn mặt ----
+  function doEnroll(embedding) {
+    setStatus('⏳ Đang lưu sinh trắc học...', 'warning');
+    send('ENROLL', { maNV, descriptor: JSON.stringify(embedding) });
+  }
+
+  // ---- Xác thực khuôn mặt ----
+  function doVerify(currentEmbedding) {
+    setStatus('⏳ Đang đối chiếu...', 'warning');
+
+    if (!faceData) {
+      setStatus('❌ Chưa có dữ liệu khuôn mặt đã đăng ký!', 'error');
+      reticle.className = 'error';
+      showRetry();
+      return;
+    }
+
+    // Human.js dùng Similarity (0→1), cao hơn = giống hơn
+    // Ngưỡng > 0.60 = khớp (tương đương euclidean < 0.5 của face-api)
+    const similarity = human.match.similarity(currentEmbedding, faceData);
+    console.log('[FaceVerify] Similarity:', similarity);
+
+    if (similarity > 0.60) {
+      setStatus('✅ Nhận diện thành công!', 'success');
+      reticle.className = 'active';
+      send('VERIFIED', { maNV, distance: similarity });
+      stopCamera();
+    } else {
+      setStatus(`❌ Không khớp! (${(similarity * 100).toFixed(1)}%)`, 'error');
+      reticle.className = 'error';
+      showRetry();
+      send('FAILED', { maNV, distance: similarity });
+    }
   }
 
   btnRetry.onclick = () => {
-      btnRetry.classList.add('hidden'); 
-      setStatus('Vui lòng đưa mặt vào khung hình', '');
-      startAutoScan(); 
+    hideRetry();
+    setStatus('Đưa mặt vào khung hình', '');
+    // Nếu camera đã tắt (sau VERIFIED/error nghiêm trọng), khởi động lại
+    if (!video.srcObject || !video.srcObject.active) {
+      initHuman();
+    } else {
+      startScan();
+    }
   };
 </script>
 </body>
