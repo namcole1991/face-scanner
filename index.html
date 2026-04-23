@@ -2734,7 +2734,17 @@ const GPSCheckIn = () => {
         } else {
             return `Hệ thống chỉ cho phép điểm danh từ ${start} hôm nay đến ${end} hôm sau. Vui lòng quay lại sau!`;
         }
-    }, [officeLocation]);
+    // TẠO CÂU THÔNG BÁO THỜI GIAN HỢP LỆ (Hôm nay / Ngày mai)
+const validTimeMsg = useMemo(() => {
+    if (!officeLocation) return '';
+    const start = officeLocation.time_start;
+    const end = officeLocation.time_end;
+    if (start <= end) {
+        return `💡 Thời gian cho phép điểm danh hôm nay: từ ${start} đến ${end}`;
+    } else {
+        return `💡 Thời gian cho phép điểm danh : từ ${start} hôm nay đến ${end} ngày mai.`;
+    }
+}, [officeLocation]);
 
     const isInRange = distance !== null && officeLocation && distance <= officeLocation.radius;
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -2802,10 +2812,10 @@ const GPSCheckIn = () => {
 
     return (
         <Box>
-            <Box sx={{ mb: { xs: 2, md: 4 }, display: { xs: 'none', md: 'block' } }}>
-                <Typography variant="h5" sx={{ color: '#111827', fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>Chấm Công GPS & Khuôn Mặt</Typography>
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>Hệ thống yêu cầu xác thực kép để đảm bảo tính chính xác</Typography>
-            </Box>
+            <Box sx={{ mb: { xs: 2, md: 4 } }}>
+    <Typography variant="h5" sx={{ color: '#111827', fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>Điểm Danh xác thực GPS & Khuôn Mặt</Typography>
+    <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>Hệ thống yêu cầu xác thực kép để đảm bảo tính chính xác</Typography>
+</Box>
 
             {!hasFaceData && (
                 <Alert severity="warning" sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}>
@@ -2822,7 +2832,7 @@ const GPSCheckIn = () => {
 {/* HIỂN THỊ THÔNG BÁO THỜI GIAN HỢP LỆ */}
 {hasFaceData && officeLocation && isTimeValid && !todayRecord && (
     <Alert severity="info" sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold' }}>
-        💡 Thời gian cho phép điểm danh hôm nay: từ {officeLocation.time_start} đến {officeLocation.time_end}
+        {validTimeMsg}
     </Alert>
 )}
             <Grid container spacing={{ xs: 2, md: 3 }}>
