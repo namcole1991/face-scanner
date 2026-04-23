@@ -290,85 +290,134 @@ async function initHuman() {
 function checkOcclusion(face) {
     const result = { glasses: false, mask: false, message: '' };
 
-    if (!face.mesh || face.mesh.length < 468) return result;
+    // ============================================
+    // KIỂM TRA KÍNH — dùng iris score
+    // Human.js v3 trả về face.iris với độ tin cậy
+    // Kính làm giảm độ rõ của iris
+    // ============================================
+    const irisLeft  = face.iris?.[0] ?? null; // iris trái
+    const irisRight = face.iris?.[1] ?? null; // iris phải
 
-    const mesh = face.mesh; // 468 điểm [x, y, z]
+    // Nếu có dữ liệu iris, kiểm tra confidence
+    if (irisLeft !== null && irisRight !== null) {
+        // iris score thấp < 0.3 có thể do kính dày/tối
+        // Nhưng phương pháp này không đủ tin cậy
+        // → Tắt kiểm tra kính qua iris, dùng cách khác
+    }
+
+    // Cách đáng tin cậy hơn: kiểm tra qua faceScore tổng thể
+    // Human.js trả về các score riêng biệt
+    const detectionScore = face.score        ?? 1; // score phát hiện mặt
+    const meshScore      = face.faceScore    ?? 1; // score mesh
+    const descScore      = face.genderScore  ?? 1; // score phụ
+
+    console.log('[Occlusion] detectionScore:', detectionScore?.toFixed(3),
+                'meshScore:', meshScore?.toFixed(3));
 
     // ============================================
-    // KIỂM TRA KÍNH MẮT
-    // Dùng vùng quanh mắt: so sánh độ sâu (z)
-    // của điểm trên sống mũi vs điểm quanh mắt
-    // Nếu có kính, các điểm vùng mắt bị đẩy ra ngoài (z cao hơn)
+    // KIỂM TRA KHẨU TRANG — dùng mesh landmarks
+    // So sánh Y position của vùng mũi vs miệng
+    // Khẩu trang làm các điểm vùng miệng bị "flat" bất thường
     // ============================================
+    if (face.mesh && face.mesh.length >= 468) {
+        const mesh = face.mesh;
 
-    // Điểm landmark vùng mắt trái (theo MediaPipe 468)
-    const leftEyeIndices  = [33, 7, 163, 144, 145, 153, 154, 155, 133];
-    const rightEyeIndices = [362, 382, 381, 380, 374, 373, 390, 249, 263];
-    // Điểm sống mũi (ít bị ảnh hưởng bởi kính)
-    const noseIndices = [1, 2, 5, 4, 19, 94];
+        // Helper lấy tọa độ trung bình
+        const avgCoord = (indices, axis) => {
+            const axisIdx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+            const sum = indices.reduce((acc, i) => acc + (mesh[i]?.[axisIdx] || 0), 0);
+            return sum / indices.length;
+        };
 
-    const avgZ = (indices) => {
-        const sum = indices.reduce((acc, i) => acc + (mesh[i]?.[2] || 0), 0);
-        return sum / indices.length;
-    };
+        // --- PHÁT HIỆN KHẨU TRANG ---
+        // Ý tưởng: Khoảng cách Y từ mũi xuống cằm bị thu hẹp khi đeo khẩu trang
+        // vì khẩu trang đẩy landmarks vào bên trong
 
-    const leftEyeZ  = avgZ(leftEyeIndices);
-    const rightEyeZ = avgZ(rightEyeIndices);
-    const noseZ     = avgZ(noseIndices);
-    const eyeAvgZ   = (leftEyeZ + rightEyeZ) / 2;
+        // Điểm mũi dưới
+        const noseTipY   = mesh[4]?.[1]  || 0;
+        // Điểm cằm
+        const chinY      = mesh[152]?.[1] || 0;
+        // Điểm môi trên
+        const upperLipY  = mesh[13]?.[1]  || 0;
+        // Điểm môi dưới
+        const lowerLipY  = mesh[14]?.[1]  || 0;
+        // Điểm trán (để tính tỉ lệ khuôn mặt)
+        const foreheadY  = mesh[10]?.[1]  || 0;
 
-    // Kính làm tăng độ sâu vùng mắt so với mũi
-    const zDiff = eyeAvgZ - noseZ;
-    console.log('[Occlusion] Eye Z:', eyeAvgZ.toFixed(3), 'Nose Z:', noseZ.toFixed(3), 'Diff:', zDiff.toFixed(3));
+        // Tổng chiều cao mặt
+        const faceHeight = Math.abs(chinY - foreheadY);
 
-    // Ngưỡng: nếu vùng mắt cao hơn mũi > 0.03 → có kính
-    if (zDiff > 0.04) {
-        result.glasses = true;
+        // Khoảng cách từ mũi → cằm (bình thường ~40-45% chiều cao mặt)
+        const noseToChin = Math.abs(chinY - noseTipY);
+        // Độ mở miệng theo tỉ lệ
+        const lipGap     = Math.abs(lowerLipY - upperLipY);
+
+        // Tỉ lệ
+        const noseChinRatio = faceHeight > 0 ? noseToChin / faceHeight : 0.4;
+        const lipGapRatio   = faceHeight > 0 ? lipGap / faceHeight     : 0.05;
+
+        console.log('[Mask] faceHeight:', faceHeight.toFixed(1),
+                    'noseToChin:', noseToChin.toFixed(1),
+                    'noseChinRatio:', noseChinRatio.toFixed(3),
+                    'lipGapRatio:', lipGapRatio.toFixed(3));
+
+        // Khẩu trang làm noseChinRatio nhỏ hơn bình thường (< 0.28)
+        // vì landmarks bị đẩy lên/vào trong
+        if (noseChinRatio < 0.28 && faceHeight > 50) {
+            result.mask = true;
+        }
+
+        // --- PHÁT HIỆN KÍNH ---
+        // Ý tưởng: So sánh khoảng cách giữa 2 mắt với chiều rộng mặt
+        // Kính không ảnh hưởng đến tỉ lệ này → dùng eye openness thay thế
+
+        // Điểm mắt trái (trên/dưới)
+        const leftEyeTop    = mesh[159]?.[1] || 0; // mí trên mắt trái
+        const leftEyeBottom = mesh[145]?.[1] || 0; // mí dưới mắt trái
+        // Điểm mắt phải (trên/dưới)
+        const rightEyeTop    = mesh[386]?.[1] || 0;
+        const rightEyeBottom = mesh[374]?.[1]  || 0;
+
+        // Độ mở mắt
+        const leftEyeOpen  = Math.abs(leftEyeBottom  - leftEyeTop);
+        const rightEyeOpen = Math.abs(rightEyeBottom - rightEyeTop);
+        const avgEyeOpen   = (leftEyeOpen + rightEyeOpen) / 2;
+
+        // Chiều rộng mắt trái (để tính tỉ lệ)
+        const leftEyeLeft  = mesh[33]?.[0]  || 0;
+        const leftEyeRight = mesh[133]?.[0] || 0;
+        const eyeWidth     = Math.abs(leftEyeRight - leftEyeLeft);
+
+        // Eye Aspect Ratio (EAR) — tỉ lệ mở mắt
+        // Bình thường EAR ~ 0.25-0.35
+        // Kính dày/tối làm EAR KHÔNG thay đổi nhiều → không dùng EAR cho kính
+
+        // Thay vào đó: Dùng face.annotations.leftEye score nếu có
+        // Hoặc kiểm tra qua detectionScore + meshScore thấp bất thường
+
+        const eyeOpenRatio = eyeWidth > 0 ? avgEyeOpen / eyeWidth : 0.3;
+
+        console.log('[Glasses] avgEyeOpen:', avgEyeOpen.toFixed(2),
+                    'eyeWidth:', eyeWidth.toFixed(2),
+                    'EAR:', eyeOpenRatio.toFixed(3));
+
+        // Kính râm tối: làm giảm detectionScore + meshScore đáng kể
+        // Kính thường: ít ảnh hưởng → KHÔNG chặn kính thường
+        // Chỉ chặn kính râm (tối) làm ảnh hưởng nhận diện
+
+        // detectionScore < 0.5 VÀ meshScore < 0.5 → kính râm tối
+        if (detectionScore < 0.50 && meshScore < 0.50) {
+            result.glasses = true;
+        }
     }
 
     // ============================================
-    // KIỂM TRA KHẨU TRANG
-    // Vùng miệng + cằm bị che → các điểm mesh
-    // vùng đó có độ lệch bất thường so với mũi
+    // TỔNG HỢP MESSAGE
     // ============================================
-
-    // Điểm vùng miệng (landmark 61→91 vùng môi ngoài)
-    const mouthOuterIndices = [61, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185];
-    // Điểm vùng cằm
-    const chinIndices = [152, 148, 176, 149, 150, 136, 172, 58, 132];
-    // Điểm vùng má giữa (ít bị che bởi khẩu trang)
-    const cheekIndices = [234, 454, 323, 361, 288, 397, 365, 379, 378, 400];
-
-    const mouthZ  = avgZ(mouthOuterIndices);
-    const chinZ   = avgZ(chinIndices);
-    const cheekZ  = avgZ(cheekIndices);
-
-    const mouthChinAvgZ = (mouthZ + chinZ) / 2;
-    const maskZDiff     = mouthChinAvgZ - cheekZ;
-
-    console.log('[Occlusion] Mouth+Chin Z:', mouthChinAvgZ.toFixed(3), 'Cheek Z:', cheekZ.toFixed(3), 'Diff:', maskZDiff.toFixed(3));
-
-    // Nếu vùng miệng/cằm cao hơn má → có khẩu trang che
-    if (maskZDiff > 0.035) {
-        result.mask = true;
-    }
-
-    // ============================================
-    // PHƯƠNG PHÁP 2: Kiểm tra faceScore vùng
-    // Nếu description score thấp bất thường → mặt bị che
-    // (Dùng kết hợp để tăng độ chính xác)
-    // ============================================
-    const descScore = face.faceScore || face.score || 1;
-    if (descScore < 0.55) {
-        // Score thấp thường do mặt bị che một phần lớn
-        result.mask = true;
-    }
-
-    // Tổng hợp message
     if (result.glasses && result.mask) {
-        result.message = '🕶️😷 Vui lòng THÁO KÍNH và THÁO KHẨU TRANG!';
+        result.message = '🕶️😷 Vui lòng THÁO KÍNH RÂM và THÁO KHẨU TRANG!';
     } else if (result.glasses) {
-        result.message = '🕶️ Vui lòng THÁO KÍNH ra!';
+        result.message = '🕶️ Vui lòng THÁO KÍNH RÂM ra!';
     } else if (result.mask) {
         result.message = '😷 Vui lòng THÁO KHẨU TRANG ra!';
     }
