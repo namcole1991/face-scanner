@@ -292,137 +292,53 @@ function checkOcclusion(face) {
     if (!face.mesh || face.mesh.length < 468) return result;
 
     const mesh = face.mesh;
-
-    // ============================================
-    // HELPER
-    // ============================================
     const pt = (i) => mesh[i] || [0, 0, 0];
+    const dist2D = (a, b) => Math.sqrt(Math.pow(pt(a)[0] - pt(b)[0], 2) + Math.pow(pt(a)[1] - pt(b)[1], 2));
 
-    // Khoảng cách Euclidean 2D giữa 2 điểm
-    const dist2D = (a, b) => Math.sqrt(
-        Math.pow(pt(a)[0] - pt(b)[0], 2) +
-        Math.pow(pt(a)[1] - pt(b)[1], 2)
-    );
-
-    // ============================================
-    // TÍNH CHIỀU CAO MẶT (chuẩn hóa)
-    // Dùng để normalize các khoảng cách
-    // Trán (10) → Cằm (152)
-    // ============================================
     const faceHeight = dist2D(10, 152);
-    if (faceHeight < 30) return result; // Mặt quá nhỏ, bỏ qua
+    if (faceHeight < 30) return result; 
 
-    // ============================================
-    // PHÁT HIỆN KÍNH
-    // Dùng Eye Aspect Ratio (EAR) — tỉ lệ cao/rộng mắt
-    //
-    // KHÔNG đeo kính: EAR bình thường 0.20 ~ 0.40
-    // ĐEO kính: frame kính làm các điểm mesh
-    // vùng mí mắt bị "kéo" → EAR bất thường
-    //
-    // Thực tế: kính làm tăng khoảng cách vertical
-    // của vùng quanh mắt so với horizontal
-    // → EAR tăng bất thường > 0.42
-    //
-    // Ngoài ra dùng thêm: khoảng cách mắt-lông mày
-    // Kính có gọng → đẩy lông mày lên, tăng khoảng cách
-    // ============================================
+    // --- PHÁT HIỆN KÍNH (Đã nới lỏng) ---
+    const leftEyeVertical1 = dist2D(159, 145); 
+    const leftEyeVertical2 = dist2D(158, 153); 
+    const leftEyeHorizontal = dist2D(33, 133); 
+    const leftEAR = leftEyeHorizontal > 0 ? (leftEyeVertical1 + leftEyeVertical2) / (2 * leftEyeHorizontal) : 0;
 
-    // --- Mắt TRÁI ---
-    // Theo MediaPipe Face Mesh 468 landmarks:
-    // Mí trên: 159, 158, 157, 173
-    // Mí dưới: 145, 144, 163, 7
-    // Góc trong: 133, góc ngoài: 33
-    const leftEyeVertical1 = dist2D(159, 145); // điểm trên-dưới giữa
-    const leftEyeVertical2 = dist2D(158, 153); // điểm trên-dưới lệch
-    const leftEyeHorizontal = dist2D(33, 133); // chiều ngang mắt
-    const leftEAR = leftEyeHorizontal > 0
-        ? (leftEyeVertical1 + leftEyeVertical2) / (2 * leftEyeHorizontal)
-        : 0;
-
-    // --- Mắt PHẢI ---
-    // Mí trên: 386, 385, 384, 398
-    // Mí dưới: 374, 373, 390, 249
-    // Góc trong: 362, góc ngoài: 263
     const rightEyeVertical1 = dist2D(386, 374);
     const rightEyeVertical2 = dist2D(385, 380);
     const rightEyeHorizontal = dist2D(362, 263);
-    const rightEAR = rightEyeHorizontal > 0
-        ? (rightEyeVertical1 + rightEyeVertical2) / (2 * rightEyeHorizontal)
-        : 0;
+    const rightEAR = rightEyeHorizontal > 0 ? (rightEyeVertical1 + rightEyeVertical2) / (2 * rightEyeHorizontal) : 0;
 
     const avgEAR = (leftEAR + rightEAR) / 2;
 
-    // --- Khoảng cách lông mày → mắt ---
-    // Lông mày trái: 70 (giữa), Mí trên trái: 159
-    // Lông mày phải: 300 (giữa), Mí trên phải: 386
     const leftBrowEyeDist  = dist2D(70, 159)  / faceHeight;
     const rightBrowEyeDist = dist2D(300, 386) / faceHeight;
     const avgBrowEyeDist   = (leftBrowEyeDist + rightBrowEyeDist) / 2;
 
-    console.log('[Glasses] leftEAR:', leftEAR.toFixed(3),
-                'rightEAR:', rightEAR.toFixed(3),
-                'avgEAR:', avgEAR.toFixed(3),
-                'browEyeDist:', avgBrowEyeDist.toFixed(3));
+    // NỚI LỎNG: Tăng EAR từ 0.42 lên 0.48 và khoảng cách lông mày từ 0.16 lên 0.20
+    if (avgBrowEyeDist > 0.20 || avgEAR > 0.48) {
+        result.glasses = true;
+    }
 
-    // Kính gọng dày làm avgBrowEyeDist tăng (> 0.12)
-    // hoặc làm EAR tăng bất thường (> 0.38) do frame kính
-    if (avgBrowEyeDist > 0.16 || avgEAR > 0.42) {
-    result.glasses = true;
-}
-
-    // ============================================
-    // PHÁT HIỆN KHẨU TRANG / CHE MIỆNG
-    //
-    // Ý tưởng chính:
-    // 1. Khoảng cách mũi → cằm (noseChinDist)
-    //    Bình thường: 35~45% chiều cao mặt
-    //    Khẩu trang: landmarks miệng/cằm bị đẩy → ratio giảm
-    //
-    // 2. Lip visibility: khoảng cách môi trên → môi dưới
-    //    Bình thường: 3~8% chiều cao mặt
-    //    Che miệng: landmarks bị flatten → ratio rất nhỏ < 2%
-    //
-    // 3. Mouth width ratio: chiều rộng miệng / chiều rộng mặt
-    //    Khẩu trang làm thu hẹp vùng miệng
-    // ============================================
-
-    // Khoảng cách mũi dưới (4) → cằm (152)
+    // --- PHÁT HIỆN KHẨU TRANG (Đã nới lỏng) ---
     const noseChinDist  = dist2D(4, 152) / faceHeight;
-
-    // Môi trên giữa (13) → Môi dưới giữa (14)
     const lipHeight     = dist2D(13, 14) / faceHeight;
-
-    // Góc miệng trái (61) → Góc miệng phải (291)
     const mouthWidth    = dist2D(61, 291);
-    // Chiều rộng mặt: gò má trái (234) → gò má phải (454)
     const faceWidth     = dist2D(234, 454);
     const mouthWidthRatio = faceWidth > 0 ? mouthWidth / faceWidth : 0.5;
 
-    // Điểm phân cách mũi-miệng: dưới vách ngăn mũi (2) → môi trên (0)
-    const philtrumDist  = dist2D(2, 0) / faceHeight;
-
-    console.log('[Mask] noseChinDist:', noseChinDist.toFixed(3),
-                'lipHeight:', lipHeight.toFixed(3),
-                'mouthWidthRatio:', mouthWidthRatio.toFixed(3),
-                'philtrumDist:', philtrumDist.toFixed(3));
-
-    // Điều kiện phát hiện khẩu trang / che miệng:
-    // - lipHeight < 0.025: môi gần như không thấy (bị che)
-    // - mouthWidthRatio < 0.35: miệng quá hẹp so với mặt
-    // - noseChinDist < 0.30: khoảng mũi-cằm bị thu ngắn
+    // NỚI LỎNG: Môi phải thật sự bị che khuất (lipHeight < 0.005 thay vì 0.010)
+    // Và khoảng mũi-cằm phải bị thu rất hẹp (noseChinDist < 0.15 thay vì 0.24)
     const isMouthCovered =
-    (lipHeight < 0.010) ||
-    (mouthWidthRatio < 0.28 && noseChinDist < 0.28) ||
-    (noseChinDist < 0.24);
+        (lipHeight < 0.005) ||
+        (mouthWidthRatio < 0.20 && noseChinDist < 0.20) ||
+        (noseChinDist < 0.15);
 
     if (isMouthCovered) {
         result.mask = true;
     }
 
-    // ============================================
-    // TỔNG HỢP MESSAGE
-    // ============================================
+    // --- TỔNG HỢP MESSAGE ---
     if (result.glasses && result.mask) {
         result.message = '🕶️😷 Vui lòng THÁO KÍNH và THÁO KHẨU TRANG!';
     } else if (result.glasses) {
@@ -432,6 +348,34 @@ function checkOcclusion(face) {
     }
 
     return result;
+}
+
+// ---- Xác thực khuôn mặt ----
+function doVerify(currentEmbedding) {
+    setStatus('⏳ Đang đối chiếu...', 'warning');
+
+    if (!faceData) {
+        setStatus('❌ Chưa có dữ liệu khuôn mặt đã đăng ký!', 'error');
+        reticle.className = 'error';
+        showRetry();
+        return;
+    }
+
+    const similarity = human.match.similarity(currentEmbedding, faceData);
+    console.log('[FaceVerify] Similarity:', similarity);
+
+    // HẠ NGƯỠNG XÁC THỰC: Từ 0.60 xuống 0.45 để phù hợp với thực tế ánh sáng/góc độ
+    if (similarity > 0.45) {
+        setStatus('✅ Nhận diện thành công!', 'success');
+        reticle.className = 'active';
+        send('VERIFIED', { maNV, distance: similarity });
+        stopCamera();
+    } else {
+        setStatus(`❌ Không khớp! (${(similarity * 100).toFixed(1)}%)`, 'error');
+        reticle.className = 'error';
+        showRetry();
+        send('FAILED', { maNV, distance: similarity });
+    }
 }
 
 // ---- Vòng quét chính (đã tích hợp kiểm tra occlusion) ----
@@ -543,34 +487,6 @@ if (occlusion.glasses || occlusion.mask) {
     send('ENROLL', { maNV, descriptor: JSON.stringify(embedding) });
   }
 
-  // ---- Xác thực khuôn mặt ----
-  function doVerify(currentEmbedding) {
-    setStatus('⏳ Đang đối chiếu...', 'warning');
-
-    if (!faceData) {
-      setStatus('❌ Chưa có dữ liệu khuôn mặt đã đăng ký!', 'error');
-      reticle.className = 'error';
-      showRetry();
-      return;
-    }
-
-    // Human.js dùng Similarity (0→1), cao hơn = giống hơn
-    // Ngưỡng > 0.60 = khớp (tương đương euclidean < 0.5 của face-api)
-    const similarity = human.match.similarity(currentEmbedding, faceData);
-    console.log('[FaceVerify] Similarity:', similarity);
-
-    if (similarity > 0.60) {
-      setStatus('✅ Nhận diện thành công!', 'success');
-      reticle.className = 'active';
-      send('VERIFIED', { maNV, distance: similarity });
-      stopCamera();
-    } else {
-      setStatus(`❌ Không khớp! (${(similarity * 100).toFixed(1)}%)`, 'error');
-      reticle.className = 'error';
-      showRetry();
-      send('FAILED', { maNV, distance: similarity });
-    }
-  }
 
   btnRetry.onclick = () => {
     hideRetry();
