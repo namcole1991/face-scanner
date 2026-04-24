@@ -2709,20 +2709,31 @@ const GPSCheckIn = () => {
                 setShowFaceScanner(true);
             };
 
+// 1. CẬP NHẬT HÀM BẤM NÚT ĐIỂM DANH
             const handleCheckInClick = () => {
+                // Kiểm tra thời gian trước
                 if (!isTimeValid) {
                     setToast({ open: true, msg: `❌ Hiện tại đang ngoài giờ điểm danh (${officeLocation?.time_start} - ${officeLocation?.time_end})`, severity: 'error' });
                     return;
                 }
+
+                // THÊM MỚI: KIỂM TRA GPS TRƯỚC KHI MỞ CAMERA
+                if (!userLocation || gpsStatus !== 'success') {
+                    setToast({ open: true, msg: '❌ Chưa lấy được tọa độ GPS. Vui lòng chờ hoặc bật định vị trên thiết bị!', severity: 'error' });
+                    return;
+                }
+                
+                if (!isInRange) {
+                    setToast({ open: true, msg: `❌ Bạn đang ở ngoài phạm vi KTX (cách ${Math.round(distance)}m, cho phép: ${officeLocation.radius}m). Không thể mở camera điểm danh!`, severity: 'error' });
+                    return;
+                }
+
+                // Nếu vượt qua hết các điều kiện trên thì mới cho mở Camera
                 setScannerMode('VERIFY');
                 setShowFaceScanner(true);
             };
 
-            const handleCancelScanner = () => {
-                setShowFaceScanner(false);
-                setToast({ open: true, msg: '⚠️ ĐIỂM DANH CHƯA THÀNH CÔNG (Bạn đã hủy xác thực khuôn mặt)', severity: 'warning' });
-            };
-
+            // 2. CẬP NHẬT HÀM XỬ LÝ SAU KHI QUÉT MẶT THÀNH CÔNG
             const handleFaceSuccess = () => {
                 setShowFaceScanner(false); 
 
@@ -2731,18 +2742,17 @@ const GPSCheckIn = () => {
                     return; 
                 }
 
-                if (!userLocation || gpsStatus !== 'success') {
-                    setToast({ open: true, msg: '❌ Chưa lấy được tọa độ GPS. ĐIỂM DANH CHƯA THÀNH CÔNG!', severity: 'error' });
-                    return;
-                }
-                
-                if (!isInRange) {
-                    setToast({ open: true, msg: `❌ Vị trí nằm ngoài quy định (${Math.round(distance)}m > ${officeLocation.radius}m). ĐIỂM DANH CHƯA THÀNH CÔNG!`, severity: 'error' });
-                    return;
-                }
-
+                // Vì chúng ta đã kiểm tra GPS kỹ ở bước bấm nút rồi, 
+                // nên ở đây chỉ cần gọi thẳng lên Server để ghi nhận điểm danh.
                 executeCheckInOnServer();
             };
+
+            const handleCancelScanner = () => {
+                setShowFaceScanner(false);
+                setToast({ open: true, msg: '⚠️ ĐIỂM DANH CHƯA THÀNH CÔNG (Bạn đã hủy xác thực khuôn mặt)', severity: 'warning' });
+            };
+
+            
 
             const executeCheckInOnServer = () => {
                 setCheckingIn(true);
