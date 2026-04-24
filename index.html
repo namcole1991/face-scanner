@@ -1236,12 +1236,12 @@ const EmployeeList = () => {
                 bienSoXe: '', soTheXe: '', loaiXe: '' 
             });
 
-            // 2. LOGIC KIỂM TRA TRÙNG LẶP REAL-TIME
+            // 2. LOGIC KIỂM TRA TRÙNG LẶP VÀ BẮT BUỘC NHẬP
             const checkDuplicate = (field, value) => {
                 if (!value) return false;
                 return employees.some(e => 
                     e[field] && e[field].toLowerCase() === value.toLowerCase() && 
-                    (mode === 'add' || e.maNV !== form.maNV) // Bỏ qua chính sinh viên này nếu đang edit
+                    (mode === 'add' || e.maNV !== form.maNV) 
                 );
             };
 
@@ -1249,6 +1249,17 @@ const EmployeeList = () => {
             const isDuplicateCCCD = checkDuplicate('cccd', form.cccd);
             const isDuplicatePhone = checkDuplicate('soDienThoai', form.soDienThoai);
             const isDuplicateEmail = checkDuplicate('email', form.email);
+
+            // Kiểm tra các trường bắt buộc (trừ avatar và thông tin xe)
+            const isMissingRequiredFields = 
+                !form.maNV || !form.hoTen || !form.cccd || !form.soDienThoai || 
+                !form.namSinh || !form.email || !form.queQuan || 
+                !form.danToc || !form.tonGiao || !form.dienChinhSach || 
+                !form.phongBan || !form.chucVu || !form.ngayVaoLam || 
+                !form.username || !form.password;
+
+            // Nút Lưu sẽ bị khóa nếu thiếu trường bắt buộc HOẶC có lỗi trùng lặp
+            const isSaveDisabled = isMissingRequiredFields || isDuplicateMSSV || isDuplicateCCCD || isDuplicatePhone || isDuplicateEmail;
 
             // TÌM KIẾM SINH VIÊN
             const filteredEmployees = useMemo(() => {
@@ -1278,7 +1289,7 @@ const EmployeeList = () => {
                 if (mode === 'add') {
                     callServer('addEmployee', form).then((res) => {
                         if (res && res.success === false) {
-                            setToast({ open: true, msg: res.message }); // Báo lỗi trùng từ Backend
+                            setToast({ open: true, msg: res.message }); 
                         } else {
                             setToast({ open: true, msg: 'Thêm sinh viên thành công!' });
                             setOpenForm(false);
@@ -1443,22 +1454,23 @@ const EmployeeList = () => {
                                             <span className="material-icons" style={{ fontSize: 20 }}>photo_camera</span>
                                         </IconButton>
                                     </Box>
+                                    <Typography variant="body2" color="textSecondary">Ảnh đại diện (Không bắt buộc)</Typography>
                                 </Grid>
 
                                 <Grid item xs={4}>
                                     <TextField 
-                                        label="MSSV" fullWidth size="small" value={form.maNV} 
+                                        required label="MSSV" fullWidth size="small" value={form.maNV} 
                                         onChange={(e) => setForm({ ...form, maNV: e.target.value })} 
                                         disabled={mode === 'edit'}
                                         error={isDuplicateMSSV}
                                         helperText={isDuplicateMSSV ? "MSSV đã tồn tại!" : ""}
                                     />
                                 </Grid>
-                                <Grid item xs={8}><TextField label="Họ Tên" fullWidth size="small" value={form.hoTen} onChange={(e) => setForm({ ...form, hoTen: e.target.value })} /></Grid>
+                                <Grid item xs={8}><TextField required label="Họ Tên" fullWidth size="small" value={form.hoTen} onChange={(e) => setForm({ ...form, hoTen: e.target.value })} /></Grid>
                                 
                                 <Grid item xs={4}>
                                     <TextField 
-                                        label="Số CCCD" fullWidth size="small" type="number" value={form.cccd} 
+                                        required label="Số CCCD" fullWidth size="small" type="number" value={form.cccd} 
                                         onChange={(e) => setForm({ ...form, cccd: e.target.value })} 
                                         error={isDuplicateCCCD}
                                         helperText={isDuplicateCCCD ? "Số CCCD đã tồn tại!" : ""}
@@ -1466,16 +1478,16 @@ const EmployeeList = () => {
                                 </Grid>
                                 <Grid item xs={4}>
                                     <TextField 
-                                        label="Số Điện Thoại" fullWidth size="small" type="number" value={form.soDienThoai} 
+                                        required label="Số Điện Thoại" fullWidth size="small" type="number" value={form.soDienThoai} 
                                         onChange={(e) => setForm({ ...form, soDienThoai: e.target.value })} 
                                         error={isDuplicatePhone}
                                         helperText={isDuplicatePhone ? "Số điện thoại đã tồn tại!" : ""}
                                     />
                                 </Grid>
-                                <Grid item xs={4}><TextField label="Ngày Sinh" fullWidth size="small" type="date" InputLabelProps={{ shrink: true }} value={form.namSinh} onChange={(e) => setForm({ ...form, namSinh: e.target.value })} /></Grid>
+                                <Grid item xs={4}><TextField required label="Ngày Sinh" fullWidth size="small" type="date" InputLabelProps={{ shrink: true }} value={form.namSinh} onChange={(e) => setForm({ ...form, namSinh: e.target.value })} /></Grid>
                                 
                                 <Grid item xs={4}>
-                                    <FormControl fullWidth size="small">
+                                    <FormControl fullWidth size="small" required>
                                         <InputLabel>Giới Tính</InputLabel>
                                         <Select value={form.gioiTinh || 'Nam'} label="Giới Tính" onChange={(e) => setForm({ ...form, gioiTinh: e.target.value })}>
                                             <MenuItem value="Nam">Nam</MenuItem><MenuItem value="Nữ">Nữ</MenuItem>
@@ -1484,7 +1496,7 @@ const EmployeeList = () => {
                                 </Grid>
                                 <Grid item xs={8}>
                                     <TextField 
-                                        label="Email" fullWidth size="small" type="email" value={form.email} 
+                                        required label="Email" fullWidth size="small" type="email" value={form.email} 
                                         onChange={(e) => setForm({ ...form, email: e.target.value })} 
                                         error={isDuplicateEmail}
                                         helperText={isDuplicateEmail ? "Email đã tồn tại!" : ""}
@@ -1495,7 +1507,7 @@ const EmployeeList = () => {
                                 <Grid item xs={12} sx={{mt: 2}}><Typography variant="subtitle2" color="primary">2. Hộ khẩu & Lưu trú</Typography><Divider /></Grid>
                                 
                                 <Grid item xs={4}>
-                                    <FormControl fullWidth size="small">
+                                    <FormControl fullWidth size="small" required>
                                         <InputLabel>Tỉnh/Thành Phố</InputLabel>
                                         <Select value={form.queQuan} label="Tỉnh/Thành Phố" onChange={(e) => setForm({ ...form, queQuan: e.target.value })}>
                                             {options?.provinces?.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
@@ -1503,7 +1515,7 @@ const EmployeeList = () => {
                                     </FormControl>
                                 </Grid>
                                 <Grid item xs={4}>
-                                    <FormControl fullWidth size="small">
+                                    <FormControl fullWidth size="small" required>
                                         <InputLabel>Dân tộc</InputLabel>
                                         <Select value={form.danToc} label="Dân tộc" onChange={(e) => setForm({ ...form, danToc: e.target.value })}>
                                             {options?.ethnics?.map(e => <MenuItem key={e} value={e}>{e}</MenuItem>)}
@@ -1511,7 +1523,7 @@ const EmployeeList = () => {
                                     </FormControl>
                                 </Grid>
                                 <Grid item xs={4}>
-                                    <FormControl fullWidth size="small">
+                                    <FormControl fullWidth size="small" required>
                                         <InputLabel>Tôn giáo</InputLabel>
                                         <Select value={form.tonGiao} label="Tôn giáo" onChange={(e) => setForm({ ...form, tonGiao: e.target.value })}>
                                             {options?.religions?.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
@@ -1519,7 +1531,7 @@ const EmployeeList = () => {
                                     </FormControl>
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <FormControl fullWidth size="small">
+                                    <FormControl fullWidth size="small" required>
                                         <InputLabel>Diện chính sách</InputLabel>
                                         <Select value={form.dienChinhSach} label="Diện chính sách" onChange={(e) => setForm({ ...form, dienChinhSach: e.target.value })}>
                                             {options?.policies?.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
@@ -1528,7 +1540,7 @@ const EmployeeList = () => {
                                 </Grid>
 
                                 <Grid item xs={4}>
-                                    <FormControl fullWidth size="small">
+                                    <FormControl fullWidth size="small" required>
                                         <InputLabel>Khu / Tòa nhà</InputLabel>
                                         <Select value={form.phongBan} label="Khu / Tòa nhà" onChange={(e) => setForm({ ...form, phongBan: e.target.value })}>
                                             {departments.map(d => <MenuItem key={d.maPB} value={d.tenPB}>{d.tenPB}</MenuItem>)}
@@ -1536,14 +1548,14 @@ const EmployeeList = () => {
                                     </FormControl>
                                 </Grid>
                                 <Grid item xs={4}>
-                                    <FormControl fullWidth size="small">
+                                    <FormControl fullWidth size="small" required>
                                         <InputLabel>Phòng ở</InputLabel>
                                         <Select value={form.chucVu} label="Phòng ở" onChange={(e) => setForm({ ...form, chucVu: e.target.value })}>
                                             {positions.map(p => <MenuItem key={p.maCV} value={p.tenCV}>{p.tenCV}</MenuItem>)}
                                         </Select>
                                     </FormControl>
                                 </Grid>
-                                <Grid item xs={4}><TextField label="Ngày Vào KTX" fullWidth size="small" type="date" InputLabelProps={{ shrink: true }} value={form.ngayVaoLam} onChange={(e) => setForm({ ...form, ngayVaoLam: e.target.value })} /></Grid>
+                                <Grid item xs={4}><TextField required label="Ngày Vào KTX" fullWidth size="small" type="date" InputLabelProps={{ shrink: true }} value={form.ngayVaoLam} onChange={(e) => setForm({ ...form, ngayVaoLam: e.target.value })} /></Grid>
 
                                 {/* Thông tin xe */}
                                 <Grid item xs={12} sx={{mt: 2}}><Typography variant="subtitle2" color="primary">3. Thông tin xe (Không bắt buộc)</Typography><Divider /></Grid>
@@ -1553,8 +1565,8 @@ const EmployeeList = () => {
 
                                 {/* Tài khoản */}
                                 <Grid item xs={12} sx={{mt: 2}}><Typography variant="subtitle2" color="primary">4. Tài khoản truy cập</Typography><Divider /></Grid>
-                                <Grid item xs={6}><TextField label="Tên Đăng Nhập" fullWidth size="small" value={form.username || ''} onChange={(e) => setForm({ ...form, username: e.target.value })} /></Grid>
-                                <Grid item xs={6}><TextField label="Mật Khẩu" fullWidth size="small" value={form.password || ''} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Grid>
+                                <Grid item xs={6}><TextField required label="Tên Đăng Nhập" fullWidth size="small" value={form.username || ''} onChange={(e) => setForm({ ...form, username: e.target.value })} /></Grid>
+                                <Grid item xs={6}><TextField required label="Mật Khẩu" fullWidth size="small" value={form.password || ''} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Grid>
                             </Grid>
                         </DialogContent>
                         <DialogActions sx={{ p: 2 }}>
@@ -1562,8 +1574,7 @@ const EmployeeList = () => {
                             <Button 
                                 variant="contained" 
                                 onClick={handleSubmit}
-                                // Khóa nút Lưu nếu chưa nhập MSSV, Họ tên hoặc có bất kỳ lỗi trùng lặp nào
-                                disabled={!form.maNV || !form.hoTen || isDuplicateMSSV || isDuplicateCCCD || isDuplicatePhone || isDuplicateEmail}
+                                disabled={isSaveDisabled}
                             >
                                 Lưu Hồ Sơ
                             </Button>
@@ -1625,7 +1636,6 @@ const EmployeeList = () => {
                 </Box>
             );
         };
-
         const LeaveRequests = () => {
             const { leaves, setLeaves, employees, confirmAction, user } = React.useContext(DataContext);
             const [open, setOpen] = useState(false);
