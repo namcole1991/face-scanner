@@ -114,6 +114,10 @@
     <div id="root"></div>
 
     <script type="text/babel">
+    const PROVINCES = ["Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ", "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu", "Bắc Ninh", "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước", "Bình Thuận", "Cà Mau", "Cao Bằng", "Đắk Lắk", "Đắk Nông", "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Giang", "Hà Nam", "Hà Tĩnh", "Hải Dương", "Hậu Giang", "Hòa Bình", "Hưng Yên", "Khánh Hòa", "Kiên Giang", "Kon Tum", "Lai Châu", "Lâm Đồng", "Lạng Sơn", "Lào Cai", "Long An", "Nam Định", "Nghệ An", "Ninh Bình", "Ninh Thuận", "Phú Thọ", "Phú Yên", "Quảng Bình", "Quảng Nam", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị", "Sóc Trăng", "Sơn La", "Tây Ninh", "Thái Bình", "Thái Nguyên", "Thanh Hóa", "Thừa Thiên Huế", "Tiền Giang", "Trà Vinh", "Tuyên Quang", "Vĩnh Long", "Vĩnh Phúc", "Yên Bái"];
+const ETHNICS = ["Kinh", "Tày", "Thái", "Mường", "Khmer", "Hoa", "Nùng", "H'Mông", "Dao", "Gia Rai", "Ê Đê", "Ba Na", "Sán Chay", "Chăm", "Cơ Tu", "Sán Dìu", "Hrê", "Ra Glai", "Mnông", "Xtiêng", "Bru-Vân Kiều", "Thổ", "Khơ Mú", "Cơ Ho", "Tà Ôi", "Mạ", "Giẻ-Triêng", "Co", "Chơ Ro", "Xinh Mun", "Hà Nhì", "Chu Ru", "Lào", "La Chí", "Kháng", "Phù Lá", "La Hủ", "La Ha", "Pà Thẻn", "Lự", "Ngái", "Chứt", "Lô Lô", "Mảng", "Cờ Lao", "Bố Y", "Cống", "Si La", "Pu Péo", "Rơ Măm", "Brâu", "Ơ Đu", "Khác"];
+const RELIGIONS = ["Không", "Phật giáo", "Công giáo", "Cao Đài", "Hòa Hảo", "Tin Lành", "Hồi giáo", "Khác"];
+const POLICIES = ["1. Anh hùng LLVT/Con TB-LS", "2. Khuyết tật", "3. Hộ nghèo", "4. Cận nghèo", "5. Dân tộc", "6. Vùng cao/biên giới", "7. Mồ côi cha và mẹ", "8. Mồ côi cha hoặc mẹ", "9. Khó khăn", "10. Khác"];
 // --- GLOBALS & UTILS ---
         const { useState, useEffect, useMemo, useCallback, useRef, Fragment } = React;
         
@@ -291,20 +295,17 @@ const callServer = async (func, ...args) => {
                 setMobileOpen(!mobileOpen);
             };
 
-            // RBAC: Filter Menu Items
-            const allMenuItems = [
-                { id: 'dashboard', label: 'Tổng quan', icon: Icons.Dashboard, roles: ['ADMIN'] },
-                { id: 'timekeeping', label: 'Điểm danh', icon: 'fact_check', roles: ['ADMIN'] },
-                { id: 'gps_checkin', label: 'Điểm danh GPS', icon: 'my_location', roles: ['EMPLOYEE'] },
-                { id: 'calendar', label: 'Lịch làm việc', icon: 'calendar_month', roles: ['ADMIN'] },
-                { id: 'employees', label: 'Nhân sự', icon: Icons.Employees, roles: ['ADMIN'] },
-                { id: 'departments', label: 'Phòng ban', icon: Icons.Departments, roles: ['ADMIN'] },
-                { id: 'positions', label: 'Chức vụ', icon: Icons.Positions, roles: ['ADMIN'] },
-                { id: 'leave', label: 'Nghỉ phép', icon: Icons.Leave, roles: ['ADMIN', 'EMPLOYEE'] },
-                { id: 'salary_settings', label: 'Cài đặt lương', icon: 'payments', roles: ['ADMIN'] },
-                { id: 'salary_calculation', label: 'Bảng lương', icon: 'account_balance_wallet', roles: ['ADMIN'] },
-                { id: 'gps_settings', label: 'Cài đặt GPS', icon: 'settings_suggest', roles: ['ADMIN'] },
-            ];
+const allMenuItems = [
+    { id: 'dashboard', label: 'Tổng quan', icon: Icons.Dashboard, roles: ['ADMIN'] },
+    { id: 'timekeeping', label: 'Điểm danh', icon: 'fact_check', roles: ['ADMIN'] },
+    { id: 'gps_checkin', label: 'Điểm danh GPS', icon: 'my_location', roles: ['EMPLOYEE'] },
+    { id: 'calendar', label: 'Lịch hoạt động', icon: 'calendar_month', roles: ['ADMIN'] },
+    { id: 'employees', label: 'Sinh viên', icon: Icons.Employees, roles: ['ADMIN'] },
+    { id: 'departments', label: 'Khu / Tòa nhà', icon: Icons.Departments, roles: ['ADMIN'] },
+    { id: 'positions', label: 'Phòng ở', icon: Icons.Positions, roles: ['ADMIN'] },
+    { id: 'leave', label: 'Đơn từ', icon: Icons.Leave, roles: ['ADMIN', 'EMPLOYEE'] },
+    { id: 'gps_settings', label: 'Cài đặt GPS', icon: 'settings_suggest', roles: ['ADMIN'] },
+];
 
             const menuItems = allMenuItems.filter(item => item.roles.includes(user?.role || 'ADMIN'));
 
@@ -1215,24 +1216,26 @@ const callServer = async (func, ...args) => {
             );
         };
 
-        // --- OPTIMIZED EMPLOYEES ---
-        const EmployeeList = () => {
+const EmployeeList = () => {
             const { employees, setEmployees, confirmAction, departments, positions } = React.useContext(DataContext);
             const [openForm, setOpenForm] = useState(false);
             const [openDetail, setOpenDetail] = useState(false);
-            const [scanUser, setScanUser] = useState(null); // Quản lý xem đang quét mặt ai
-const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
-            const [mode, setMode] = useState('add'); // 'add' or 'edit'
+            const [scanUser, setScanUser] = useState(null);
+            const openFaceScan = (emp) => setScanUser(emp);
+            const [mode, setMode] = useState('add');
             const [selectedEmp, setSelectedEmp] = useState(null);
-
-            // Search State
             const [searchTerm, setSearchTerm] = useState('');
-
-            const [form, setForm] = useState({ maNV: '', hoTen: '', email: '', phongBan: '', chucVu: '', ngayVaoLam: '', username: '', password: '', avatar: '', gioiTinh: 'Nam', namSinh: '', soDienThoai: '', queQuan: '' });
             const [toast, setToast] = useState({ open: false, msg: '' });
             const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-            // Filtered Employees
+            // Cập nhật state khởi tạo form với các trường mới
+            const [form, setForm] = useState({ 
+                maNV: '', hoTen: '', email: '', phongBan: '', chucVu: '', ngayVaoLam: '', 
+                username: '', password: '', avatar: '', gioiTinh: 'Nam', namSinh: '', soDienThoai: '', 
+                queQuan: '', cccd: '', danToc: 'Kinh', tonGiao: 'Không', dienChinhSach: '10. Khác',
+                bienSoXe: '', soTheXe: '', loaiXe: '' 
+            });
+
             const filteredEmployees = useMemo(() => {
                 if (!searchTerm) return employees;
                 const lowerTerm = searchTerm.toLowerCase();
@@ -1242,17 +1245,19 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                 );
             }, [employees, searchTerm]);
 
-            // Reset form
             const resetForm = () => {
-                setForm({ maNV: '', hoTen: '', email: '', phongBan: '', chucVu: '', ngayVaoLam: '', username: '', password: '', avatar: '', gioiTinh: 'Nam', namSinh: '', soDienThoai: '', queQuan: '' });
+                setForm({ 
+                    maNV: '', hoTen: '', email: '', phongBan: '', chucVu: '', ngayVaoLam: '', 
+                    username: '', password: '', avatar: '', gioiTinh: 'Nam', namSinh: '', soDienThoai: '', 
+                    queQuan: '', cccd: '', danToc: 'Kinh', tonGiao: 'Không', dienChinhSach: '10. Khác',
+                    bienSoXe: '', soTheXe: '', loaiXe: '' 
+                });
                 setMode('add');
                 setSelectedEmp(null);
             };
 
-            // Handle Add/Edit Submit
             const handleSubmit = () => {
                 if (mode === 'add') {
-                    // OPTIMISTIC ADD
                     const newEmp = { ...form, maNV: 'Đang tạo...' };
                     const prev = [...employees];
                     setEmployees(prev => [newEmp, ...prev]);
@@ -1268,9 +1273,8 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                         setToast({ open: true, msg: 'Lỗi khi thêm!' });
                     });
                 } else {
-                    // OPTIMISTIC EDIT
                     const prev = [...employees];
-                    const updatedEmp = { ...form }; // form has maNV
+                    const updatedEmp = { ...form };
                     setEmployees(prev => prev.map(e => e.maNV === updatedEmp.maNV ? updatedEmp : e));
                     setOpenForm(false);
                     setToast({ open: true, msg: 'Đang cập nhật...' });
@@ -1285,7 +1289,6 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                 }
             };
 
-            // Handle Delete
             const handleDelete = (maNV) => {
                 const performDelete = () => {
                     const prev = [...employees];
@@ -1299,7 +1302,7 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                         setToast({ open: true, msg: 'Lỗi khi xóa!' });
                     });
                 };
-                confirmAction('Xóa Nhân Viên', `Bạn có chắc chắn muốn xóa nhân viên ${maNV}?`, performDelete);
+                confirmAction('Xóa Sinh Viên', `Bạn có chắc chắn muốn xóa sinh viên ${maNV}?`, performDelete);
             };
 
             const openEdit = (emp) => {
@@ -1324,13 +1327,13 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                             <Avatar src={emp.avatar} sx={{ bgcolor: theme.palette.primary.main }}>{emp.hoTen ? emp.hoTen.charAt(0) : '?'}</Avatar>
                             <Box>
                                 <Typography variant="subtitle1" fontWeight="bold">{emp.hoTen}</Typography>
-                                <Typography variant="caption" color="textSecondary">{emp.email}</Typography>
+                                <Typography variant="caption" color="textSecondary">MSSV: {emp.maNV}</Typography>
                             </Box>
                         </Box>
                         <Divider sx={{ mb: 2 }} />
                         <Grid container spacing={1} sx={{ mb: 2 }}>
-                            <Grid item xs={6}><Typography variant="caption" color="textSecondary">Mã NV</Typography><Typography variant="body2">{emp.maNV}</Typography></Grid>
-                            <Grid item xs={6}><Typography variant="caption" color="textSecondary">Phòng ban</Typography><Chip label={emp.phongBan} size="small" variant="outlined" /></Grid>
+                            <Grid item xs={6}><Typography variant="caption" color="textSecondary">Tòa nhà</Typography><Typography variant="body2">{emp.phongBan}</Typography></Grid>
+                            <Grid item xs={6}><Typography variant="caption" color="textSecondary">Phòng ở</Typography><Chip label={emp.chucVu} size="small" variant="outlined" /></Grid>
                         </Grid>
                         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                             <IconButton size="small" color="primary" onClick={() => openView(emp)}><span className="material-icons">visibility</span></IconButton>
@@ -1341,195 +1344,62 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                 </Card>
             );
 
-            // Row Component for Collapsible Table
-            const Row = ({ emp, openView, openEdit, handleDelete }) => {
-                const [open, setOpen] = useState(false);
-                const { attendance } = React.useContext(DataContext);
-                const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
-
-                // Calculate Monthly Stats
-                const monthlyStats = useMemo(() => {
-                    const currentYear = new Date().getFullYear();
-                    const empAtt = attendance.filter(a => {
-                        if (a.maNV !== emp.maNV) return false;
-                        const d = new Date(a.date);
-                        return d.getMonth() + 1 === filterMonth && d.getFullYear() === currentYear;
-                    });
-
-                    const late = empAtt.filter(a => a.trangThai === 'Đi Muộn').length;
-                    const absent = empAtt.filter(a => a.trangThai === 'Vắng').length;
-                    const totalViolations = late + absent;
-
-                    return { late, absent, totalViolations, records: empAtt.filter(a => a.trangThai === 'Đi Muộn' || a.trangThai === 'Vắng') };
-                }, [attendance, emp.maNV, filterMonth]);
-
-                return (
-                    <React.Fragment>
-                        <TableRow sx={{ '& > *': { borderBottom: 'unset' } }} hover>
-                            <TableCell>
-                                <IconButton aria-label="expand row" size="small" onClick={() => setOpen(!open)}>
-                                    <span className="material-icons">{open ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}</span>
-                                </IconButton>
-                            </TableCell>
-                            <TableCell><Typography variant="body2" fontWeight="bold">{emp.maNV}</Typography></TableCell>
-                            <TableCell>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                    <Avatar src={emp.avatar} sx={{ width: 32, height: 32, bgcolor: theme.palette.primary.main }}>{emp.hoTen ? emp.hoTen.charAt(0) : '?'}</Avatar>
-                                    <Box>
-                                        <Typography variant="body2" fontWeight="500">{emp.hoTen}</Typography>
-                                        <Typography variant="caption" color="textSecondary">{emp.email}</Typography>
-                                    </Box>
-                                </Box>
-                            </TableCell>
-                            <TableCell>
-                                <Typography variant="body2">{emp.phongBan}</Typography>
-                                <Typography variant="caption" color="textSecondary">{emp.chucVu}</Typography>
-                            </TableCell>
-                            <TableCell align="center">
-                                <Typography variant="body2" fontWeight="bold" color="primary">
-                                    {emp.stats?.daysOff || 0} / {emp.stats?.maxLeaves || 12}
-                                </Typography>
-                            </TableCell>
-                            <TableCell align="center"><Typography variant="body2">{emp.stats?.total || 0}</Typography></TableCell>
-                            <TableCell align="center">
-                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                                    <Chip label={`Duyệt: ${emp.stats?.approved || 0}`} size="small" color="success" variant="outlined" sx={{ height: 20, fontSize: 10 }} />
-                                    <Chip label={`Từ chối: ${emp.stats?.rejected || 0}`} size="small" color="error" variant="outlined" sx={{ height: 20, fontSize: 10 }} />
-                                </Box>
-                            </TableCell>
-                            <TableCell align="right">
-    {/* Thêm nút quét mặt vào đây */}
-    <IconButton color="secondary" size="small" onClick={() => openFaceScan(emp)}>
-        <span className="material-icons">face_retouching_natural</span>
-    </IconButton>
-    <IconButton color="info" size="small" onClick={() => openEdit(emp)}><span className="material-icons">edit</span></IconButton>
-    <IconButton color="error" size="small" onClick={() => handleDelete(emp.maNV)}><span className="material-icons">delete</span></IconButton>
-</TableCell>
-                        </TableRow>
-                        <TableRow>
-                            <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
-                                <Collapse in={open} timeout="auto" unmountOnExit>
-                                    <Box sx={{ margin: 2, p: 2, bgcolor: '#f9fafb', borderRadius: 2 }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                            <Typography variant="h6" gutterBottom component="div" sx={{ fontSize: '1rem', fontWeight: 'bold' }}>
-                                                Chi Tiết Vi Phạm - Tháng {filterMonth}
-                                            </Typography>
-                                            <FormControl size="small" sx={{ minWidth: 120 }}>
-                                                <Select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} sx={{ bgcolor: 'white' }}>
-                                                    {[...Array(12)].map((_, i) => <MenuItem key={i + 1} value={i + 1}>Tháng {i + 1}</MenuItem>)}
-                                                </Select>
-                                            </FormControl>
-                                        </Box>
-
-                                        <Grid container spacing={2} sx={{ mb: 2 }}>
-                                            <Grid item xs={4}>
-                                                <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: '#fef3c7' }} variant="outlined">
-                                                    <Typography variant="caption" color="textSecondary">Đi Muộn</Typography>
-                                                    <Typography variant="h6" color="#d97706">{monthlyStats.late}</Typography>
-                                                </Paper>
-                                            </Grid>
-                                            <Grid item xs={4}>
-                                                <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: '#fee2e2' }} variant="outlined">
-                                                    <Typography variant="caption" color="textSecondary">Vắng Mặt</Typography>
-                                                    <Typography variant="h6" color="#dc2626">{monthlyStats.absent}</Typography>
-                                                </Paper>
-                                            </Grid>
-                                            <Grid item xs={4}>
-                                                <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: '#e0f2fe' }} variant="outlined">
-                                                    <Typography variant="caption" color="textSecondary">Tổng Vi Phạm</Typography>
-                                                    <Typography variant="h6" color="#0284c7">{monthlyStats.totalViolations}</Typography>
-                                                </Paper>
-                                            </Grid>
-                                        </Grid>
-
-                                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>Nhật Ký Vi Phạm</Typography>
-                                        {monthlyStats.records.length === 0 ? (
-                                            <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>Không có ghi nhận vi phạm trong tháng này.</Typography>
-                                        ) : (
-                                            <Table size="small" aria-label="purchases">
-                                                <TableHead>
-                                                    <TableRow>
-                                                        <TableCell>Ngày</TableCell>
-                                                        <TableCell>Loại Vi Phạm</TableCell>
-                                                        <TableCell>Ghi Chú</TableCell>
-                                                    </TableRow>
-                                                </TableHead>
-                                                <TableBody>
-                                                    {monthlyStats.records.map((historyRow) => (
-                                                        <TableRow key={historyRow.date}>
-                                                            <TableCell component="th" scope="row">{new Date(historyRow.date).toLocaleDateString('vi-VN')}</TableCell>
-                                                            <TableCell>
-                                                                <Chip
-                                                                    label={historyRow.trangThai}
-                                                                    size="small"
-                                                                    sx={{
-                                                                        bgcolor: historyRow.trangThai === 'Đi Muộn' ? '#fef3c7' : '#fee2e2',
-                                                                        color: historyRow.trangThai === 'Đi Muộn' ? '#d97706' : '#dc2626',
-                                                                        fontWeight: 'bold'
-                                                                    }}
-                                                                />
-                                                            </TableCell>
-                                                            <TableCell>{historyRow.ghiChu || '-'}</TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        )}
-                                    </Box>
-                                </Collapse>
-                            </TableCell>
-                        </TableRow>
-                    </React.Fragment>
-                );
-            };
-
-
-
-
             return (
                 <Box>
                     <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', mb: 3, gap: 2 }}>
-                        <Typography variant="h5" color="textPrimary">Danh Sách Nhân Viên</Typography>
+                        <Typography variant="h5" color="textPrimary">Danh Sách Sinh Viên</Typography>
                         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                             <TextField
-                                placeholder="Tìm kiếm (Tên/Mã NV)..."
+                                placeholder="Tìm kiếm (Tên/MSSV)..."
                                 size="small"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                InputProps={{
-                                    startAdornment: <span className="material-icons" style={{ color: '#9ca3af', marginRight: 8 }}>search</span>,
-                                    sx: { bgcolor: 'white', borderRadius: 2 }
-                                }}
+                                InputProps={{ startAdornment: <span className="material-icons" style={{ color: '#9ca3af', marginRight: 8 }}>search</span>, sx: { bgcolor: 'white', borderRadius: 2 } }}
                             />
-                            <Button variant="contained" startIcon={<span className="material-icons">person_add</span>} onClick={() => { resetForm(); setOpenForm(true); }}>Thêm NV</Button>
+                            <Button variant="contained" startIcon={<span className="material-icons">person_add</span>} onClick={() => { resetForm(); setOpenForm(true); }}>Thêm SV</Button>
                         </Box>
                     </Box>
-                    {filteredEmployees.length === 0 ? <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><Typography align="center" color="textSecondary">{searchTerm ? 'Không tìm thấy kết quả' : 'Chưa có dữ liệu'}</Typography></Box> : (
+
+                    {filteredEmployees.length === 0 ? <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><Typography align="center" color="textSecondary">Chưa có dữ liệu sinh viên</Typography></Box> : (
                         isMobile ? (
-                            <Box>
-                                {filteredEmployees.map((emp, i) => <EmployeeCard key={i} emp={emp} />)}
-                            </Box>
+                            <Box>{filteredEmployees.map((emp, i) => <EmployeeCard key={i} emp={emp} />)}</Box>
                         ) : (
                             <Paper sx={{ overflow: 'hidden' }}>
                                 <TableContainer>
                                     <Table>
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell />
-                                                <TableCell>Mã NV</TableCell>
-                                                <TableCell>Họ Tên / Email</TableCell>
-                                                <TableCell>Phòng Ban / Chức Vụ</TableCell>
-                                                <TableCell align="center">Ngày Nghỉ</TableCell>
-                                                <TableCell align="center">Số Đơn</TableCell>
-                                                <TableCell align="center">Kết Quả</TableCell>
+                                                <TableCell>MSSV</TableCell>
+                                                <TableCell>Họ Tên / Căn cước</TableCell>
+                                                <TableCell>Khu / Phòng ở</TableCell>
+                                                <TableCell>Điện Thoại</TableCell>
                                                 <TableCell align="right">Thao Tác</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
-                                            {filteredEmployees.length === 0 ? (
-                                                <TableRow><TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>{searchTerm ? 'Không tìm thấy kết quả' : 'Chưa có dữ liệu nhân viên'}</TableCell></TableRow>
-                                            ) : filteredEmployees.map((emp) => (
-                                                <Row key={emp.maNV} emp={emp} openView={openView} openEdit={openEdit} handleDelete={handleDelete} />
+                                            {filteredEmployees.map((emp) => (
+                                                <TableRow key={emp.maNV} hover>
+                                                    <TableCell><Typography variant="body2" fontWeight="bold">{emp.maNV}</Typography></TableCell>
+                                                    <TableCell>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                            <Avatar src={emp.avatar} sx={{ width: 32, height: 32, bgcolor: theme.palette.primary.main }}>{emp.hoTen ? emp.hoTen.charAt(0) : '?'}</Avatar>
+                                                            <Box>
+                                                                <Typography variant="body2" fontWeight="500">{emp.hoTen}</Typography>
+                                                                <Typography variant="caption" color="textSecondary">CCCD: {emp.cccd}</Typography>
+                                                            </Box>
+                                                        </Box>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="body2">{emp.phongBan}</Typography>
+                                                        <Typography variant="caption" color="textSecondary">{emp.chucVu}</Typography>
+                                                    </TableCell>
+                                                    <TableCell>{emp.soDienThoai}</TableCell>
+                                                    <TableCell align="right">
+                                                        <IconButton color="secondary" size="small" onClick={() => openFaceScan(emp)}><span className="material-icons">face_retouching_natural</span></IconButton>
+                                                        <IconButton color="info" size="small" onClick={() => openEdit(emp)}><span className="material-icons">edit</span></IconButton>
+                                                        <IconButton color="error" size="small" onClick={() => handleDelete(emp.maNV)}><span className="material-icons">delete</span></IconButton>
+                                                    </TableCell>
+                                                </TableRow>
                                             ))}
                                         </TableBody>
                                     </Table>
@@ -1539,146 +1409,176 @@ const openFaceScan = (emp) => setScanUser(emp); // Hàm mở camera
                     )}
 
                     {/* ADD / EDIT DIALOG */}
-                    <Dialog open={openForm} onClose={() => setOpenForm(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-                        <DialogTitle>{mode === 'add' ? 'Thêm Nhân Viên Mới' : 'Cập Nhật Nhân Viên'}</DialogTitle>
+                    <Dialog open={openForm} onClose={() => setOpenForm(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+                        <DialogTitle>{mode === 'add' ? 'Thêm Sinh Viên Mới' : 'Cập Nhật Hồ Sơ Sinh Viên'}</DialogTitle>
                         <DialogContent>
                             <Grid container spacing={2} sx={{ mt: 0 }}>
-                                {mode === 'edit' && <Grid item xs={12}><TextField label="Mã NV" fullWidth size="small" value={form.maNV} disabled /></Grid>}
-
-                                {/* Avatar Upload */}
+                                {/* Thông tin cơ bản */}
+                                <Grid item xs={12}><Typography variant="subtitle2" color="primary">1. Thông tin cơ bản</Typography><Divider /></Grid>
+                                
                                 <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                     <Box sx={{ position: 'relative' }}>
                                         <Avatar src={form.avatar} sx={{ width: 64, height: 64, bgcolor: '#e0e0e0' }} />
                                         <IconButton
-                                            color="primary"
-                                            aria-label="upload picture"
-                                            component="label"
+                                            color="primary" component="label"
                                             sx={{ position: 'absolute', bottom: -10, right: -10, bgcolor: 'white', '&:hover': { bgcolor: '#f5f5f5' } }}
                                         >
                                             <input hidden accept="image/*" type="file" onChange={(e) => {
                                                 const file = e.target.files[0];
                                                 if (file) {
                                                     const reader = new FileReader();
-                                                    reader.onloadend = () => {
-                                                        setForm(prev => ({ ...prev, avatar: reader.result }));
-                                                    };
+                                                    reader.onloadend = () => setForm(prev => ({ ...prev, avatar: reader.result }));
                                                     reader.readAsDataURL(file);
                                                 }
                                             }} />
                                             <span className="material-icons" style={{ fontSize: 20 }}>photo_camera</span>
                                         </IconButton>
                                     </Box>
-                                    <Typography variant="body2" color="textSecondary">Tải lên ảnh chân dung</Typography>
                                 </Grid>
 
-                                <Grid item xs={12}><TextField label="Họ Tên" fullWidth size="small" value={form.hoTen} onChange={(e) => setForm({ ...form, hoTen: e.target.value })} /></Grid>
-                                <Grid item xs={6}><TextField label="Email" fullWidth size="small" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Grid>
-                                <Grid item xs={6}><TextField label="Số Điện Thoại" fullWidth size="small" value={form.soDienThoai} onChange={(e) => setForm({ ...form, soDienThoai: e.target.value })} /></Grid>
-
-                                <Grid item xs={6}>
+                                {mode === 'edit' && <Grid item xs={4}><TextField label="MSSV" fullWidth size="small" value={form.maNV} disabled /></Grid>}
+                                <Grid item xs={mode==='edit'?8:12}><TextField label="Họ Tên" fullWidth size="small" value={form.hoTen} onChange={(e) => setForm({ ...form, hoTen: e.target.value })} /></Grid>
+                                
+                                <Grid item xs={4}><TextField label="Số CCCD" fullWidth size="small" type="number" value={form.cccd} onChange={(e) => setForm({ ...form, cccd: e.target.value })} /></Grid>
+                                <Grid item xs={4}><TextField label="Số Điện Thoại" fullWidth size="small" type="number" value={form.soDienThoai} onChange={(e) => setForm({ ...form, soDienThoai: e.target.value })} /></Grid>
+                                <Grid item xs={4}><TextField label="Ngày Sinh" fullWidth size="small" type="date" InputLabelProps={{ shrink: true }} value={form.namSinh} onChange={(e) => setForm({ ...form, namSinh: e.target.value })} /></Grid>
+                                
+                                <Grid item xs={4}>
                                     <FormControl fullWidth size="small">
                                         <InputLabel>Giới Tính</InputLabel>
                                         <Select value={form.gioiTinh || 'Nam'} label="Giới Tính" onChange={(e) => setForm({ ...form, gioiTinh: e.target.value })}>
-                                            <MenuItem value="Nam">Nam</MenuItem>
-                                            <MenuItem value="Nữ">Nữ</MenuItem>
+                                            <MenuItem value="Nam">Nam</MenuItem><MenuItem value="Nữ">Nữ</MenuItem>
                                         </Select>
                                     </FormControl>
                                 </Grid>
-                                <Grid item xs={6}><TextField label="Ngày Sinh" fullWidth size="small" type="date" InputLabelProps={{ shrink: true }} value={form.namSinh} onChange={(e) => setForm({ ...form, namSinh: e.target.value })} /></Grid>
+                                <Grid item xs={8}><TextField label="Email" fullWidth size="small" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Grid>
 
-                                <Grid item xs={12}><TextField label="Quê Quán" fullWidth size="small" value={form.queQuan} onChange={(e) => setForm({ ...form, queQuan: e.target.value })} /></Grid>
-
-                                <Grid item xs={6}>
+                                {/* Thông tin lưu trú & chính sách */}
+                                <Grid item xs={12} sx={{mt: 2}}><Typography variant="subtitle2" color="primary">2. Hộ khẩu & Lưu trú</Typography><Divider /></Grid>
+                                
+                                <Grid item xs={4}>
                                     <FormControl fullWidth size="small">
-                                        <InputLabel>Phòng Ban</InputLabel>
-                                        <Select value={form.phongBan} label="Phòng Ban" onChange={(e) => setForm({ ...form, phongBan: e.target.value })}>
+                                        <InputLabel>Tỉnh/Thành Phố</InputLabel>
+                                        <Select value={form.queQuan} label="Tỉnh/Thành Phố" onChange={(e) => setForm({ ...form, queQuan: e.target.value })}>
+                                            {PROVINCES.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={4}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Dân tộc</InputLabel>
+                                        <Select value={form.danToc} label="Dân tộc" onChange={(e) => setForm({ ...form, danToc: e.target.value })}>
+                                            {ETHNICS.map(e => <MenuItem key={e} value={e}>{e}</MenuItem>)}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={4}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Tôn giáo</InputLabel>
+                                        <Select value={form.tonGiao} label="Tôn giáo" onChange={(e) => setForm({ ...form, tonGiao: e.target.value })}>
+                                            {RELIGIONS.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Diện chính sách</InputLabel>
+                                        <Select value={form.dienChinhSach} label="Diện chính sách" onChange={(e) => setForm({ ...form, dienChinhSach: e.target.value })}>
+                                            {POLICIES.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+
+                                <Grid item xs={4}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Khu / Tòa nhà</InputLabel>
+                                        <Select value={form.phongBan} label="Khu / Tòa nhà" onChange={(e) => setForm({ ...form, phongBan: e.target.value })}>
                                             {departments.map(d => <MenuItem key={d.maPB} value={d.tenPB}>{d.tenPB}</MenuItem>)}
                                         </Select>
                                     </FormControl>
                                 </Grid>
-                                <Grid item xs={6}>
+                                <Grid item xs={4}>
                                     <FormControl fullWidth size="small">
-                                        <InputLabel>Chức Vụ</InputLabel>
-                                        <Select value={form.chucVu} label="Chức Vụ" onChange={(e) => setForm({ ...form, chucVu: e.target.value })}>
+                                        <InputLabel>Phòng ở</InputLabel>
+                                        <Select value={form.chucVu} label="Phòng ở" onChange={(e) => setForm({ ...form, chucVu: e.target.value })}>
                                             {positions.map(p => <MenuItem key={p.maCV} value={p.tenCV}>{p.tenCV}</MenuItem>)}
                                         </Select>
                                     </FormControl>
                                 </Grid>
+                                <Grid item xs={4}><TextField label="Ngày Vào KTX" fullWidth size="small" type="date" InputLabelProps={{ shrink: true }} value={form.ngayVaoLam} onChange={(e) => setForm({ ...form, ngayVaoLam: e.target.value })} /></Grid>
 
-                                <Grid item xs={12}><TextField label="Ngày Vào Làm" fullWidth size="small" type="date" InputLabelProps={{ shrink: true }} value={form.ngayVaoLam} onChange={(e) => setForm({ ...form, ngayVaoLam: e.target.value })} /></Grid>
+                                {/* Thông tin xe */}
+                                <Grid item xs={12} sx={{mt: 2}}><Typography variant="subtitle2" color="primary">3. Thông tin xe (Không bắt buộc)</Typography><Divider /></Grid>
+                                <Grid item xs={4}><TextField label="Biển số xe" fullWidth size="small" value={form.bienSoXe} onChange={(e) => setForm({ ...form, bienSoXe: e.target.value })} /></Grid>
+                                <Grid item xs={4}><TextField label="Số thẻ xe" fullWidth size="small" value={form.soTheXe} onChange={(e) => setForm({ ...form, soTheXe: e.target.value })} /></Grid>
+                                <Grid item xs={4}><TextField label="Loại xe (vd: Wave, Vision...)" fullWidth size="small" value={form.loaiXe} onChange={(e) => setForm({ ...form, loaiXe: e.target.value })} /></Grid>
 
-                                <Grid item xs={12}><Divider sx={{ my: 1 }}><Typography variant="caption" color="textSecondary">Tài khoản đăng nhập</Typography></Divider></Grid>
-
+                                {/* Tài khoản */}
+                                <Grid item xs={12} sx={{mt: 2}}><Typography variant="subtitle2" color="primary">4. Tài khoản truy cập</Typography><Divider /></Grid>
                                 <Grid item xs={6}><TextField label="Tên Đăng Nhập" fullWidth size="small" value={form.username || ''} onChange={(e) => setForm({ ...form, username: e.target.value })} /></Grid>
                                 <Grid item xs={6}><TextField label="Mật Khẩu" fullWidth size="small" value={form.password || ''} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Grid>
                             </Grid>
                         </DialogContent>
-                        <DialogActions sx={{ p: 2 }}><Button onClick={() => setOpenForm(false)} color="inherit">Hủy</Button><Button variant="contained" onClick={handleSubmit}>Lưu</Button></DialogActions>
+                        <DialogActions sx={{ p: 2 }}>
+                            <Button onClick={() => setOpenForm(false)} color="inherit">Hủy</Button>
+                            <Button variant="contained" onClick={handleSubmit}>Lưu Hồ Sơ</Button>
+                        </DialogActions>
                     </Dialog>
 
                     {/* VIEW DETAIL DIALOG */}
-                    <Dialog open={openDetail} onClose={() => setOpenDetail(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+                    <Dialog open={openDetail} onClose={() => setOpenDetail(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
                         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2, pb: 1 }}>
                             <Avatar src={selectedEmp?.avatar} sx={{ width: 64, height: 64, bgcolor: theme.palette.secondary.main }}>{selectedEmp?.hoTen?.charAt(0)}</Avatar>
                             <Box>
                                 <Typography variant="h6">{selectedEmp?.hoTen}</Typography>
-                                <Typography variant="caption" color="textSecondary">{selectedEmp?.maNV}</Typography>
+                                <Typography variant="caption" color="textSecondary">MSSV: {selectedEmp?.maNV} | CCCD: {selectedEmp?.cccd}</Typography>
                             </Box>
                         </DialogTitle>
                         <Divider />
                         <DialogContent>
                             <Stack spacing={2}>
-                                <Box sx={{ display: 'flex', gap: 2 }}>
-                                    <Box sx={{ flex: 1 }}><Typography variant="caption" color="textSecondary">Giới Tính</Typography><Typography variant="body1">{selectedEmp?.gioiTinh || '-'}</Typography></Box>
-                                    <Box sx={{ flex: 1 }}><Typography variant="caption" color="textSecondary">Ngày Sinh</Typography><Typography variant="body1">{selectedEmp?.namSinh ? new Date(selectedEmp.namSinh).toLocaleDateString('vi-VN') : '-'}</Typography></Box>
-                                </Box>
                                 <Grid container spacing={2}>
-                                    <Grid item xs={6}><Typography variant="caption" color="textSecondary">Email</Typography><Typography variant="body2">{selectedEmp?.email}</Typography></Grid>
-                                    <Grid item xs={6}><Typography variant="caption" color="textSecondary">Điện Thoại</Typography><Typography variant="body2">{selectedEmp?.soDienThoai || '-'}</Typography></Grid>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Giới Tính</Typography><Typography variant="body2">{selectedEmp?.gioiTinh || '-'}</Typography></Grid>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Ngày Sinh</Typography><Typography variant="body2">{selectedEmp?.namSinh ? new Date(selectedEmp.namSinh).toLocaleDateString('vi-VN') : '-'}</Typography></Grid>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Điện Thoại</Typography><Typography variant="body2">{selectedEmp?.soDienThoai || '-'}</Typography></Grid>
                                 </Grid>
-                                <Box><Typography variant="caption" color="textSecondary">Quê Quán</Typography><Typography variant="body2">{selectedEmp?.queQuan || '-'}</Typography></Box>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Tỉnh/Thành phố</Typography><Typography variant="body2">{selectedEmp?.queQuan || '-'}</Typography></Grid>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Dân tộc</Typography><Typography variant="body2">{selectedEmp?.danToc || '-'}</Typography></Grid>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Tôn giáo</Typography><Typography variant="body2">{selectedEmp?.tonGiao || '-'}</Typography></Grid>
+                                </Grid>
+                                <Box><Typography variant="caption" color="textSecondary">Diện chính sách</Typography><Typography variant="body2">{selectedEmp?.dienChinhSach || '-'}</Typography></Box>
                                 <Divider />
                                 <Grid container spacing={2}>
-                                    <Grid item xs={6}><Typography variant="caption" color="textSecondary">Phòng Ban</Typography><Typography variant="body1">{selectedEmp?.phongBan}</Typography></Grid>
-                                    <Grid item xs={6}><Typography variant="caption" color="textSecondary">Chức Vụ</Typography><Typography variant="body1">{selectedEmp?.chucVu}</Typography></Grid>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Tòa nhà</Typography><Typography variant="body2">{selectedEmp?.phongBan}</Typography></Grid>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Phòng ở</Typography><Typography variant="body2">{selectedEmp?.chucVu}</Typography></Grid>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Ngày Vào KTX</Typography><Typography variant="body2">{selectedEmp?.ngayVaoLam ? new Date(selectedEmp.ngayVaoLam).toLocaleDateString('vi-VN') : '-'}</Typography></Grid>
                                 </Grid>
-                                <Box><Typography variant="caption" color="textSecondary">Ngày Vào Làm</Typography><Typography variant="body1">{selectedEmp?.ngayVaoLam ? new Date(selectedEmp.ngayVaoLam).toLocaleDateString('vi-VN') : '-'}</Typography></Box>
+                                <Divider />
+                                <Typography variant="caption" color="primary" fontWeight="bold">Thông tin phương tiện</Typography>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Biển số</Typography><Typography variant="body2">{selectedEmp?.bienSoXe || 'Không có'}</Typography></Grid>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Số thẻ xe</Typography><Typography variant="body2">{selectedEmp?.soTheXe || 'Không có'}</Typography></Grid>
+                                    <Grid item xs={4}><Typography variant="caption" color="textSecondary">Loại xe</Typography><Typography variant="body2">{selectedEmp?.loaiXe || 'Không có'}</Typography></Grid>
+                                </Grid>
                             </Stack>
                         </DialogContent>
-                        <DialogActions>
-                            <Button onClick={() => setOpenDetail(false)}>Đóng</Button>
-                        </DialogActions>
+                        <DialogActions><Button onClick={() => setOpenDetail(false)}>Đóng</Button></DialogActions>
                     </Dialog>
 
                     <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast({ ...toast, open: false })}><Alert severity="success" variant="filled">{toast.msg}</Alert></Snackbar>
-                    {/* DIALOG QUÉT KHUÔN MẶT (DÀNH CHO ADMIN) */}
-            <Dialog 
-                open={!!scanUser} 
-                disableEscapeKeyDown={true}
-                onClose={(event, reason) => {
-                    if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') {
-                        setScanUser(null);
-                    }
-                }} 
-                fullScreen={isMobile}
-                maxWidth="sm" 
-                fullWidth 
-                PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: '#000', m: isMobile ? 0 : 2 } }}
-            >
-                {!isMobile && <DialogTitle sx={{ textAlign: 'center', pb: 1, color: '#fff' }}>Quản Lý Khuôn Mặt - {scanUser?.hoTen}</DialogTitle>}
-                
-                {/* Ép chiều cao 550px cho Desktop và 100vh cho Mobile để Camera không bị bẹp */}
-                <DialogContent sx={{ p: 0, height: isMobile ? '100vh' : '550px', overflow: 'hidden' }}>
-                    {scanUser && <FaceCheckIn user={scanUser} onVerified={() => setScanUser(null)} />}
-                </DialogContent>
-                
-                <DialogActions sx={{ justifyContent: 'center', p: 2, bgcolor: '#111827' }}>
-                    <Button onClick={() => setScanUser(null)} color="error" variant="contained" sx={{ borderRadius: 2, width: '100%', maxWidth: 300 }}>
-                        Đóng Camera
-                    </Button>
-                </DialogActions>
-            </Dialog>
-                </Box >
+                    
+                    {/* CAMERA DIALOG CỦA BẠN GIỮ NGUYÊN BÊN DƯỚI... */}
+                    <Dialog open={!!scanUser} disableEscapeKeyDown={true} onClose={(event, reason) => { if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') { setScanUser(null); } }} fullScreen={isMobile} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: '#000', m: isMobile ? 0 : 2 } }}>
+                        {!isMobile && <DialogTitle sx={{ textAlign: 'center', pb: 1, color: '#fff' }}>Quản Lý Khuôn Mặt - {scanUser?.hoTen}</DialogTitle>}
+                        <DialogContent sx={{ p: 0, height: isMobile ? '100vh' : '550px', overflow: 'hidden' }}>
+                            {scanUser && <FaceCheckIn user={scanUser} onVerified={() => setScanUser(null)} />}
+                        </DialogContent>
+                        <DialogActions sx={{ justifyContent: 'center', p: 2, bgcolor: '#111827' }}>
+                            <Button onClick={() => setScanUser(null)} color="error" variant="contained" sx={{ borderRadius: 2, width: '100%', maxWidth: 300 }}>Đóng Camera</Button>
+                        </DialogActions>
+                    </Dialog>
+                </Box>
             );
         };
 
