@@ -2975,7 +2975,6 @@ const GPSCheckIn = () => {
 const FaceCheckIn = ({ user, onVerified, mode = 'VERIFY' }) => {
     const iframeRef = useRef(null);
     const [status, setStatus] = useState('Đang khởi tạo Camera...');
-    // Thêm setEmployees để cập nhật state ngay sau khi đăng ký thành công
     const { employees, setEmployees, user: loggedInUser } = React.useContext(DataContext);
 
     const FACE_URL = 'https://namcole1991-web.github.io/face-scanner/face.html';
@@ -2987,7 +2986,7 @@ const FaceCheckIn = ({ user, onVerified, mode = 'VERIFY' }) => {
             maNV: currentEmp.maNV,
             faceData: currentEmp.face_data || null,
             role: loggedInUser?.role || 'EMPLOYEE',
-            mode: mode // Truyền mode (ENROLL hoặc VERIFY) xuống iframe
+            mode: mode 
         }, '*');
         setStatus('');
     };
@@ -3004,12 +3003,10 @@ const FaceCheckIn = ({ user, onVerified, mode = 'VERIFY' }) => {
                     iframeRef.current?.contentWindow?.postMessage({ type: 'ENROLL_RESULT', success: res.success, message: res.message }, '*');
                     
                     if (res.success) {
-                        // Cập nhật ngay dữ liệu khuôn mặt vào state để UI tự động đổi sang nút Điểm danh
                         const updatedEmployees = employees.map(emp => 
                             emp.maNV === data.maNV ? { ...emp, face_data: data.descriptor } : emp
                         );
                         setEmployees(updatedEmployees);
-                        
                         setTimeout(() => onVerified(), 1500); 
                     }
                 });
@@ -3032,22 +3029,40 @@ const FaceCheckIn = ({ user, onVerified, mode = 'VERIFY' }) => {
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#000' }}>
+            
+            {/* THÊM LỜI NHẮC ÁNH SÁNG Ở ĐÂY */}
+            <Box sx={{ 
+                bgcolor: 'rgba(245, 158, 11, 0.15)', // Nền vàng cam nhạt
+                color: '#fcd34d', // Chữ vàng sáng
+                p: 1, px: 2, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 1, 
+                justifyContent: 'center',
+                borderBottom: '1px solid rgba(245, 158, 11, 0.3)'
+            }}>
+                <span className="material-icons" style={{ fontSize: 18 }}>lightbulb</span>
+                <Typography variant="caption" sx={{ fontWeight: 500, fontSize: '0.85rem' }}>
+                    Mẹo: Giữ thẳng góc máy và tìm nơi đủ sáng để AI nhận diện nhanh nhất!
+                </Typography>
+            </Box>
+
             {status && (
                 <Typography variant="subtitle2" sx={{ textAlign: 'center', p: 1.5, fontWeight: 600, color: status.includes('❌') ? '#fca5a5' : '#6ee7b7', bgcolor: '#111827' }}>
                     {status}
                 </Typography>
             )}
+            
             <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
-            <iframe
-                ref={iframeRef}
-                src={FACE_URL}
-                onLoad={handleIframeLoad}
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-                title="Face Scanner"
-                // THÊM DẤU * ĐỂ CHO PHÉP TRUY CẬP CAMERA TỪ IFRAME KHÁC DOMAIN
-                allow="camera *; microphone *" 
-            />
-        </Box>
+                <iframe
+                    ref={iframeRef}
+                    src={FACE_URL}
+                    onLoad={handleIframeLoad}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                    title="Face Scanner"
+                    allow="camera *; microphone *" 
+                />
+            </Box>
         </Box>
     );
 };
