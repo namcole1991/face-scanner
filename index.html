@@ -2977,7 +2977,7 @@ const FaceCheckIn = ({ user, onVerified, mode = 'VERIFY' }) => {
     const [status, setStatus] = useState('Đang khởi tạo Camera...');
     const { employees, setEmployees, user: loggedInUser } = React.useContext(DataContext);
 
-    const FACE_URL = './face.html';
+    const FACE_URL = 'https://dangnhapdiemdanh.web.app/face.html';
 
     const handleIframeLoad = () => {
         const currentEmp = employees.find(e => e.maNV === user.maNV) || user;
