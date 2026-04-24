@@ -1217,7 +1217,7 @@ const allMenuItems = [
         };
 
 const EmployeeList = () => {
-            const { employees, setEmployees, confirmAction, departments, positions } = React.useContext(DataContext);
+            const { employees, setEmployees, confirmAction, departments, positions, options } = React.useContext(DataContext);
             const [openForm, setOpenForm] = useState(false);
             const [openDetail, setOpenDetail] = useState(false);
             const [scanUser, setScanUser] = useState(null);
@@ -1228,7 +1228,7 @@ const EmployeeList = () => {
             const [toast, setToast] = useState({ open: false, msg: '' });
             const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-            // Cập nhật state khởi tạo form với các trường mới
+            // 1. KHỞI TẠO STATE
             const [form, setForm] = useState({ 
                 maNV: '', hoTen: '', email: '', phongBan: '', chucVu: '', ngayVaoLam: '', 
                 username: '', password: '', avatar: '', gioiTinh: 'Nam', namSinh: '', soDienThoai: '', 
@@ -1236,6 +1236,21 @@ const EmployeeList = () => {
                 bienSoXe: '', soTheXe: '', loaiXe: '' 
             });
 
+            // 2. LOGIC KIỂM TRA TRÙNG LẶP REAL-TIME
+            const checkDuplicate = (field, value) => {
+                if (!value) return false;
+                return employees.some(e => 
+                    e[field] && e[field].toLowerCase() === value.toLowerCase() && 
+                    (mode === 'add' || e.maNV !== form.maNV) // Bỏ qua chính sinh viên này nếu đang edit
+                );
+            };
+
+            const isDuplicateMSSV = checkDuplicate('maNV', form.maNV);
+            const isDuplicateCCCD = checkDuplicate('cccd', form.cccd);
+            const isDuplicatePhone = checkDuplicate('soDienThoai', form.soDienThoai);
+            const isDuplicateEmail = checkDuplicate('email', form.email);
+
+            // TÌM KIẾM SINH VIÊN
             const filteredEmployees = useMemo(() => {
                 if (!searchTerm) return employees;
                 const lowerTerm = searchTerm.toLowerCase();
@@ -1256,36 +1271,30 @@ const EmployeeList = () => {
                 setSelectedEmp(null);
             };
 
+            // 3. XỬ LÝ LƯU DỮ LIỆU
             const handleSubmit = () => {
+                setToast({ open: true, msg: 'Đang gửi dữ liệu...' });
+
                 if (mode === 'add') {
-                    const newEmp = { ...form, maNV: 'Đang tạo...' };
-                    const prev = [...employees];
-                    setEmployees(prev => [newEmp, ...prev]);
-                    setOpenForm(false);
-                    setToast({ open: true, msg: 'Đang thêm...' });
-                    resetForm();
-
-                    callServer('addEmployee', form).then(() => {
-                        setToast({ open: true, msg: 'Thêm thành công!' });
-                        fetchAllData().then(data => setEmployees(data.employees));
-                    }).catch(() => {
-                        setEmployees(prev);
-                        setToast({ open: true, msg: 'Lỗi khi thêm!' });
-                    });
+                    callServer('addEmployee', form).then((res) => {
+                        if (res && res.success === false) {
+                            setToast({ open: true, msg: res.message }); // Báo lỗi trùng từ Backend
+                        } else {
+                            setToast({ open: true, msg: 'Thêm sinh viên thành công!' });
+                            setOpenForm(false);
+                            fetchAllData().then(data => setEmployees(data.employees));
+                        }
+                    }).catch(() => setToast({ open: true, msg: 'Lỗi kết nối máy chủ!' }));
                 } else {
-                    const prev = [...employees];
-                    const updatedEmp = { ...form };
-                    setEmployees(prev => prev.map(e => e.maNV === updatedEmp.maNV ? updatedEmp : e));
-                    setOpenForm(false);
-                    setToast({ open: true, msg: 'Đang cập nhật...' });
-                    resetForm();
-
-                    callServer('updateEmployee', updatedEmp).then(() => {
-                        setToast({ open: true, msg: 'Cập nhật thành công!' });
-                    }).catch(() => {
-                        setEmployees(prev);
-                        setToast({ open: true, msg: 'Lỗi cập nhật!' });
-                    });
+                    callServer('updateEmployee', form).then((res) => {
+                        if (res && res.success === false) {
+                            setToast({ open: true, msg: res.message });
+                        } else {
+                            setToast({ open: true, msg: 'Cập nhật thành công!' });
+                            setOpenForm(false);
+                            fetchAllData().then(data => setEmployees(data.employees));
+                        }
+                    }).catch(() => setToast({ open: true, msg: 'Lỗi cập nhật!' }));
                 }
             };
 
@@ -1408,7 +1417,7 @@ const EmployeeList = () => {
                         )
                     )}
 
-                    {/* ADD / EDIT DIALOG */}
+                    {/* 4. DIALOG THÊM / SỬA */}
                     <Dialog open={openForm} onClose={() => setOpenForm(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
                         <DialogTitle>{mode === 'add' ? 'Thêm Sinh Viên Mới' : 'Cập Nhật Hồ Sơ Sinh Viên'}</DialogTitle>
                         <DialogContent>
@@ -1436,11 +1445,33 @@ const EmployeeList = () => {
                                     </Box>
                                 </Grid>
 
-                                {mode === 'edit' && <Grid item xs={4}><TextField label="MSSV" fullWidth size="small" value={form.maNV} disabled /></Grid>}
-                                <Grid item xs={mode==='edit'?8:12}><TextField label="Họ Tên" fullWidth size="small" value={form.hoTen} onChange={(e) => setForm({ ...form, hoTen: e.target.value })} /></Grid>
+                                <Grid item xs={4}>
+                                    <TextField 
+                                        label="MSSV" fullWidth size="small" value={form.maNV} 
+                                        onChange={(e) => setForm({ ...form, maNV: e.target.value })} 
+                                        disabled={mode === 'edit'}
+                                        error={isDuplicateMSSV}
+                                        helperText={isDuplicateMSSV ? "MSSV đã tồn tại!" : ""}
+                                    />
+                                </Grid>
+                                <Grid item xs={8}><TextField label="Họ Tên" fullWidth size="small" value={form.hoTen} onChange={(e) => setForm({ ...form, hoTen: e.target.value })} /></Grid>
                                 
-                                <Grid item xs={4}><TextField label="Số CCCD" fullWidth size="small" type="number" value={form.cccd} onChange={(e) => setForm({ ...form, cccd: e.target.value })} /></Grid>
-                                <Grid item xs={4}><TextField label="Số Điện Thoại" fullWidth size="small" type="number" value={form.soDienThoai} onChange={(e) => setForm({ ...form, soDienThoai: e.target.value })} /></Grid>
+                                <Grid item xs={4}>
+                                    <TextField 
+                                        label="Số CCCD" fullWidth size="small" type="number" value={form.cccd} 
+                                        onChange={(e) => setForm({ ...form, cccd: e.target.value })} 
+                                        error={isDuplicateCCCD}
+                                        helperText={isDuplicateCCCD ? "Số CCCD đã tồn tại!" : ""}
+                                    />
+                                </Grid>
+                                <Grid item xs={4}>
+                                    <TextField 
+                                        label="Số Điện Thoại" fullWidth size="small" type="number" value={form.soDienThoai} 
+                                        onChange={(e) => setForm({ ...form, soDienThoai: e.target.value })} 
+                                        error={isDuplicatePhone}
+                                        helperText={isDuplicatePhone ? "Số điện thoại đã tồn tại!" : ""}
+                                    />
+                                </Grid>
                                 <Grid item xs={4}><TextField label="Ngày Sinh" fullWidth size="small" type="date" InputLabelProps={{ shrink: true }} value={form.namSinh} onChange={(e) => setForm({ ...form, namSinh: e.target.value })} /></Grid>
                                 
                                 <Grid item xs={4}>
@@ -1451,7 +1482,14 @@ const EmployeeList = () => {
                                         </Select>
                                     </FormControl>
                                 </Grid>
-                                <Grid item xs={8}><TextField label="Email" fullWidth size="small" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Grid>
+                                <Grid item xs={8}>
+                                    <TextField 
+                                        label="Email" fullWidth size="small" type="email" value={form.email} 
+                                        onChange={(e) => setForm({ ...form, email: e.target.value })} 
+                                        error={isDuplicateEmail}
+                                        helperText={isDuplicateEmail ? "Email đã tồn tại!" : ""}
+                                    />
+                                </Grid>
 
                                 {/* Thông tin lưu trú & chính sách */}
                                 <Grid item xs={12} sx={{mt: 2}}><Typography variant="subtitle2" color="primary">2. Hộ khẩu & Lưu trú</Typography><Divider /></Grid>
@@ -1460,7 +1498,7 @@ const EmployeeList = () => {
                                     <FormControl fullWidth size="small">
                                         <InputLabel>Tỉnh/Thành Phố</InputLabel>
                                         <Select value={form.queQuan} label="Tỉnh/Thành Phố" onChange={(e) => setForm({ ...form, queQuan: e.target.value })}>
-                                            {PROVINCES.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
+                                            {options?.provinces?.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
                                         </Select>
                                     </FormControl>
                                 </Grid>
@@ -1468,7 +1506,7 @@ const EmployeeList = () => {
                                     <FormControl fullWidth size="small">
                                         <InputLabel>Dân tộc</InputLabel>
                                         <Select value={form.danToc} label="Dân tộc" onChange={(e) => setForm({ ...form, danToc: e.target.value })}>
-                                            {ETHNICS.map(e => <MenuItem key={e} value={e}>{e}</MenuItem>)}
+                                            {options?.ethnics?.map(e => <MenuItem key={e} value={e}>{e}</MenuItem>)}
                                         </Select>
                                     </FormControl>
                                 </Grid>
@@ -1476,7 +1514,7 @@ const EmployeeList = () => {
                                     <FormControl fullWidth size="small">
                                         <InputLabel>Tôn giáo</InputLabel>
                                         <Select value={form.tonGiao} label="Tôn giáo" onChange={(e) => setForm({ ...form, tonGiao: e.target.value })}>
-                                            {RELIGIONS.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+                                            {options?.religions?.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
                                         </Select>
                                     </FormControl>
                                 </Grid>
@@ -1484,7 +1522,7 @@ const EmployeeList = () => {
                                     <FormControl fullWidth size="small">
                                         <InputLabel>Diện chính sách</InputLabel>
                                         <Select value={form.dienChinhSach} label="Diện chính sách" onChange={(e) => setForm({ ...form, dienChinhSach: e.target.value })}>
-                                            {POLICIES.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
+                                            {options?.policies?.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
                                         </Select>
                                     </FormControl>
                                 </Grid>
@@ -1521,7 +1559,14 @@ const EmployeeList = () => {
                         </DialogContent>
                         <DialogActions sx={{ p: 2 }}>
                             <Button onClick={() => setOpenForm(false)} color="inherit">Hủy</Button>
-                            <Button variant="contained" onClick={handleSubmit}>Lưu Hồ Sơ</Button>
+                            <Button 
+                                variant="contained" 
+                                onClick={handleSubmit}
+                                // Khóa nút Lưu nếu chưa nhập MSSV, Họ tên hoặc có bất kỳ lỗi trùng lặp nào
+                                disabled={!form.maNV || !form.hoTen || isDuplicateMSSV || isDuplicateCCCD || isDuplicatePhone || isDuplicateEmail}
+                            >
+                                Lưu Hồ Sơ
+                            </Button>
                         </DialogActions>
                     </Dialog>
 
@@ -1566,9 +1611,8 @@ const EmployeeList = () => {
                         <DialogActions><Button onClick={() => setOpenDetail(false)}>Đóng</Button></DialogActions>
                     </Dialog>
 
-                    <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast({ ...toast, open: false })}><Alert severity="success" variant="filled">{toast.msg}</Alert></Snackbar>
+                    <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast({ ...toast, open: false })}><Alert severity={toast.msg.includes('Lỗi') || toast.msg.includes('Cảnh báo') ? 'error' : 'success'} variant="filled">{toast.msg}</Alert></Snackbar>
                     
-                    {/* CAMERA DIALOG CỦA BẠN GIỮ NGUYÊN BÊN DƯỚI... */}
                     <Dialog open={!!scanUser} disableEscapeKeyDown={true} onClose={(event, reason) => { if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') { setScanUser(null); } }} fullScreen={isMobile} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: '#000', m: isMobile ? 0 : 2 } }}>
                         {!isMobile && <DialogTitle sx={{ textAlign: 'center', pb: 1, color: '#fff' }}>Quản Lý Khuôn Mặt - {scanUser?.hoTen}</DialogTitle>}
                         <DialogContent sx={{ p: 0, height: isMobile ? '100vh' : '550px', overflow: 'hidden' }}>
@@ -3514,9 +3558,10 @@ const FaceCheckIn = ({ user, onVerified, mode = 'VERIFY' }) => {
             });
 
             const [data, setData] = useState({
-                stats: { totalEmployees: 0, presentToday: 0, onLeaveToday: 0, pendingLeaves: 0, charts: { growth: [], dept: [], leaveStatus: [], leaveType: [], position: [] } },
-                employees: [], leaves: [], departments: [], positions: [], attendance: [], settings: {}
-            });
+    stats: { totalEmployees: 0, presentToday: 0, onLeaveToday: 0, pendingLeaves: 0, charts: { growth: [], dept: [], leaveStatus: [], leaveType: [], position: [] } },
+    employees: [], leaves: [], departments: [], positions: [], attendance: [], settings: {},
+    options: { provinces: [], ethnics: [], religions: [], policies: [] } // THÊM DÒNG NÀY
+});
             const [loading, setLoading] = useState(false);
 
             // Confirm Dialog State
@@ -3536,15 +3581,17 @@ const FaceCheckIn = ({ user, onVerified, mode = 'VERIFY' }) => {
                         setLoading(false);
                         return;
                     }
-                    setData({
-                        stats: res.dashboardStats || {},
-                        employees: res.employees || [],
-                        leaves: res.leaves || [],
-                        departments: res.departments || [],
-                        positions: res.positions || [],
-                        attendance: res.attendance || [],
-                        settings: res.settings || {}
-                    });
+// Trong hàm fetchData() của App:
+setData({
+    stats: res.dashboardStats || {},
+    employees: res.employees || [],
+    leaves: res.leaves || [],
+    departments: res.departments || [],
+    positions: res.positions || [],
+    attendance: res.attendance || [],
+    settings: res.settings || {},
+    options: res.options || { provinces: [], ethnics: [], religions: [], policies: [] } // THÊM DÒNG NÀY
+});
                     setLoading(false);
                 }).catch(err => { console.error(err); setLoading(false); });
             };
